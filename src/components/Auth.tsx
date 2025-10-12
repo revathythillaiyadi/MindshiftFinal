@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { Sparkles } from 'lucide-react';
+import { Brain } from 'lucide-react';
 
 export function Auth() {
   const [isSignUp, setIsSignUp] = useState(false);
@@ -30,16 +30,16 @@ export function Auth() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#F5F9F6] via-[#FBF8F3] to-[#F0F4F8] px-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-pink-50 via-purple-50 to-blue-50 px-4">
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-[#A8D5BA] opacity-10 rounded-full blur-3xl"></div>
-        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-[#B4C7E7] opacity-10 rounded-full blur-3xl"></div>
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-pink-400 opacity-15 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-400 opacity-15 rounded-full blur-3xl animate-pulse" style={{animationDelay: '1s'}}></div>
       </div>
 
       <div className="w-full max-w-md relative">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-[#A8D5BA] to-[#B4C7E7] rounded-2xl mb-4 shadow-lg">
-            <Sparkles className="w-8 h-8 text-white" />
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-pink-500 via-purple-500 to-blue-500 rounded-2xl mb-4 shadow-lg animate-pulse">
+            <Brain className="w-8 h-8 text-white" />
           </div>
           <h1 className="text-3xl font-semibold text-gray-800 mb-2">Mindshift</h1>
           <p className="text-gray-600">Your journey to mindful growth</p>
@@ -57,7 +57,7 @@ export function Auth() {
                   type="text"
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
-                  className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#A8D5BA] focus:border-transparent transition-all"
+                  className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400 focus:border-transparent transition-all active:scale-[0.98]"
                   placeholder="Enter your name"
                   required
                 />
@@ -104,7 +104,7 @@ export function Auth() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-gradient-to-r from-[#A8D5BA] to-[#B4C7E7] text-white font-medium py-3 px-4 rounded-xl hover:shadow-lg transform hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+              className="w-full bg-gradient-to-r from-pink-500 via-purple-500 to-blue-500 text-white font-medium py-3 px-4 rounded-xl hover:shadow-lg transform hover:-translate-y-0.5 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
             >
               {loading ? 'Please wait...' : isSignUp ? 'Create Account' : 'Sign In'}
             </button>
@@ -116,7 +116,7 @@ export function Auth() {
                 setIsSignUp(!isSignUp);
                 setError('');
               }}
-              className="text-sm text-gray-600 hover:text-[#A8D5BA] transition-colors"
+              className="text-sm text-gray-600 hover:text-pink-500 transition-colors active:scale-95"
             >
               {isSignUp ? 'Already have an account? Sign in' : "Don't have an account? Sign up"}
             </button>

@@ -1,4 +1,4 @@
-import { LogOut, Menu, X } from 'lucide-react';
+import { LogOut, Menu, X, Brain } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { ChatBot } from './ChatBot';
@@ -11,11 +11,11 @@ export function Dashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#F5F9F6] via-[#FBF8F3] to-[#F0F4F8]">
+    <div className="min-h-screen bg-gradient-to-br from-pink-50 via-purple-50 to-blue-50">
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-[#A8D5BA] opacity-5 rounded-full blur-3xl"></div>
-        <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-[#B4C7E7] opacity-5 rounded-full blur-3xl"></div>
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-[#E8D5B5] opacity-5 rounded-full blur-3xl"></div>
+        <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-pink-400 opacity-10 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-blue-400 opacity-10 rounded-full blur-3xl animate-pulse" style={{animationDelay: '1s'}}></div>
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-purple-400 opacity-10 rounded-full blur-3xl animate-pulse" style={{animationDelay: '2s'}}></div>
       </div>
 
       <nav className="relative bg-white/60 backdrop-blur-md border-b border-gray-100 px-6 py-4">
@@ -23,13 +23,18 @@ export function Dashboard() {
           <div className="flex items-center gap-3">
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="lg:hidden w-10 h-10 flex items-center justify-center rounded-xl hover:bg-gray-100 transition-colors"
+              className="lg:hidden w-10 h-10 flex items-center justify-center rounded-xl hover:bg-gray-100 transition-colors active:scale-95"
             >
               {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
-            <h1 className="text-2xl font-semibold bg-gradient-to-r from-[#A8D5BA] to-[#B4C7E7] bg-clip-text text-transparent">
-              Mindshift
-            </h1>
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 bg-gradient-to-br from-pink-500 via-purple-500 to-blue-500 rounded-lg flex items-center justify-center">
+                <Brain className="w-5 h-5 text-white" />
+              </div>
+              <h1 className="text-2xl font-semibold bg-gradient-to-r from-pink-500 via-purple-500 to-blue-500 bg-clip-text text-transparent">
+                Mindshift
+              </h1>
+            </div>
           </div>
           <div className="flex items-center gap-4">
             <div className="text-right hidden sm:block">
@@ -38,7 +43,7 @@ export function Dashboard() {
             </div>
             <button
               onClick={signOut}
-              className="w-10 h-10 flex items-center justify-center rounded-xl bg-gray-100 hover:bg-gray-200 transition-colors"
+              className="w-10 h-10 flex items-center justify-center rounded-xl bg-gray-100 hover:bg-gray-200 transition-colors active:scale-95"
               title="Sign Out"
             >
               <LogOut className="w-5 h-5 text-gray-600" />
@@ -62,7 +67,7 @@ export function Dashboard() {
           <div className={`
             lg:col-span-4
             fixed lg:relative inset-0 lg:inset-auto
-            bg-[#F5F9F6]/95 lg:bg-transparent
+            bg-pink-50/95 lg:bg-transparent
             backdrop-blur-lg lg:backdrop-blur-none
             z-50 lg:z-auto
             transition-transform duration-300
@@ -71,7 +76,7 @@ export function Dashboard() {
             <div className="h-full overflow-y-auto p-6 lg:p-0">
               <button
                 onClick={() => setSidebarOpen(false)}
-                className="lg:hidden absolute top-4 right-4 w-10 h-10 flex items-center justify-center rounded-xl bg-white hover:bg-gray-100 transition-colors"
+                className="lg:hidden absolute top-4 right-4 w-10 h-10 flex items-center justify-center rounded-xl bg-white hover:bg-gray-100 transition-colors active:scale-95"
               >
                 <X className="w-5 h-5" />
               </button>

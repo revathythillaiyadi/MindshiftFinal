@@ -79,7 +79,7 @@ export function StreaksAndAchievements() {
       <div className="bg-white rounded-3xl shadow-lg border border-gray-100 p-6">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-[#FFA500] to-[#FF6347] rounded-xl flex items-center justify-center">
+            <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-red-500 rounded-xl flex items-center justify-center animate-pulse">
               <Flame className="w-5 h-5 text-white" />
             </div>
             <div>
@@ -93,7 +93,7 @@ export function StreaksAndAchievements() {
           </div>
         </div>
 
-        <div className="bg-gradient-to-r from-[#FFA500]/10 to-[#FF6347]/10 rounded-2xl p-4">
+        <div className="bg-gradient-to-r from-orange-100 to-red-100 rounded-2xl p-4 cursor-pointer hover:shadow-md transition-all active:scale-[0.98]">
           <div className="flex items-center justify-between">
             <span className="text-sm text-gray-600">Longest Streak</span>
             <span className="text-lg font-bold text-gray-800">{profile?.longest_streak || 0} days</span>
@@ -103,7 +103,7 @@ export function StreaksAndAchievements() {
 
       <div className="bg-white rounded-3xl shadow-lg border border-gray-100 p-6">
         <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 bg-gradient-to-br from-[#FFD700] to-[#FFA500] rounded-xl flex items-center justify-center">
+          <div className="w-10 h-10 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-xl flex items-center justify-center">
             <Trophy className="w-5 h-5 text-white" />
           </div>
           <h3 className="text-lg font-semibold text-gray-800">Recent Achievements</h3>
@@ -116,9 +116,9 @@ export function StreaksAndAchievements() {
             {achievements.map((achievement) => (
               <div
                 key={achievement.id}
-                className="flex items-center gap-3 p-3 bg-gradient-to-r from-[#FFD700]/10 to-[#FFA500]/10 rounded-xl"
+                className="flex items-center gap-3 p-3 bg-gradient-to-r from-yellow-100 to-orange-100 rounded-xl cursor-pointer hover:shadow-md transition-all active:scale-[0.98]"
               >
-                <div className="w-8 h-8 bg-gradient-to-br from-[#FFD700] to-[#FFA500] rounded-lg flex items-center justify-center flex-shrink-0">
+                <div className="w-8 h-8 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-lg flex items-center justify-center flex-shrink-0">
                   <span className="text-lg">{achievement.icon}</span>
                 </div>
                 <div className="flex-1 min-w-0">
@@ -134,14 +134,14 @@ export function StreaksAndAchievements() {
       <div className="bg-white rounded-3xl shadow-lg border border-gray-100 p-6">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-[#A8D5BA] to-[#B4C7E7] rounded-xl flex items-center justify-center">
+            <div className="w-10 h-10 bg-gradient-to-br from-pink-500 via-purple-500 to-blue-500 rounded-xl flex items-center justify-center">
               <Target className="w-5 h-5 text-white" />
             </div>
             <h3 className="text-lg font-semibold text-gray-800">Goals</h3>
           </div>
           <button
             onClick={() => setShowAddGoal(true)}
-            className="w-8 h-8 bg-gradient-to-br from-[#A8D5BA] to-[#B4C7E7] rounded-lg flex items-center justify-center hover:shadow-md transition-all"
+            className="w-8 h-8 bg-gradient-to-br from-pink-500 via-purple-500 to-blue-500 rounded-lg flex items-center justify-center hover:shadow-md transition-all active:scale-95"
           >
             <Plus className="w-4 h-4 text-white" />
           </button>
@@ -155,12 +155,12 @@ export function StreaksAndAchievements() {
               onChange={(e) => setNewGoalTitle(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && addGoal()}
               placeholder="Enter your goal..."
-              className="flex-1 px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#A8D5BA] focus:border-transparent text-sm"
+              className="flex-1 px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400 focus:border-transparent text-sm active:scale-[0.99]"
               autoFocus
             />
             <button
               onClick={addGoal}
-              className="px-4 py-2 bg-gradient-to-r from-[#A8D5BA] to-[#B4C7E7] text-white rounded-xl hover:shadow-md transition-all text-sm font-medium"
+              className="px-4 py-2 bg-gradient-to-r from-pink-500 via-purple-500 to-blue-500 text-white rounded-xl hover:shadow-md transition-all active:scale-95 text-sm font-medium"
             >
               Add
             </button>
@@ -175,12 +175,12 @@ export function StreaksAndAchievements() {
               <div
                 key={goal.id}
                 onClick={() => toggleGoal(goal)}
-                className="flex items-center gap-3 p-3 bg-gray-50 hover:bg-gray-100 rounded-xl cursor-pointer transition-colors group"
+                className="flex items-center gap-3 p-3 bg-gray-50 hover:bg-gray-100 rounded-xl cursor-pointer transition-all group active:scale-[0.98]"
               >
                 {goal.completed ? (
-                  <CheckCircle2 className="w-5 h-5 text-[#A8D5BA] flex-shrink-0" />
+                  <CheckCircle2 className="w-5 h-5 text-pink-500 flex-shrink-0" />
                 ) : (
-                  <Circle className="w-5 h-5 text-gray-300 group-hover:text-[#A8D5BA] transition-colors flex-shrink-0" />
+                  <Circle className="w-5 h-5 text-gray-300 group-hover:text-pink-500 transition-colors flex-shrink-0" />
                 )}
                 <span className={`text-sm flex-1 ${goal.completed ? 'text-gray-400 line-through' : 'text-gray-700'}`}>
                   {goal.title}

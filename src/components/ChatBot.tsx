@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Send, Sparkles } from 'lucide-react';
+import { Send, Brain } from 'lucide-react';
 import { supabase, ChatMessage } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -122,10 +122,10 @@ export function ChatBot() {
 
   return (
     <div className="flex flex-col h-full bg-white rounded-3xl shadow-lg border border-gray-100 overflow-hidden">
-      <div className="bg-gradient-to-r from-[#A8D5BA] to-[#B4C7E7] p-6">
+      <div className="bg-gradient-to-r from-pink-500 via-purple-500 to-blue-500 p-6">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center">
-            <Sparkles className="w-5 h-5 text-white" />
+          <div className="w-10 h-10 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center animate-pulse">
+            <Brain className="w-5 h-5 text-white" />
           </div>
           <div>
             <h2 className="text-xl font-semibold text-white">Mindshift Assistant</h2>
@@ -137,8 +137,8 @@ export function ChatBot() {
       <div className="flex-1 overflow-y-auto p-6 space-y-4">
         {messages.length === 0 && (
           <div className="text-center py-12">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-[#A8D5BA] to-[#B4C7E7] rounded-2xl mb-4 opacity-20">
-              <Sparkles className="w-8 h-8 text-white" />
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-pink-500 via-purple-500 to-blue-500 rounded-2xl mb-4 opacity-20">
+              <Brain className="w-8 h-8 text-white" />
             </div>
             <p className="text-gray-400 text-sm">Start a conversation to begin your mindful journey</p>
           </div>
@@ -150,10 +150,10 @@ export function ChatBot() {
             className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
           >
             <div
-              className={`max-w-[80%] px-5 py-3 rounded-2xl ${
+              className={`max-w-[80%] px-5 py-3 rounded-2xl transition-all hover:scale-[1.02] ${
                 message.role === 'user'
-                  ? 'bg-[#A8D5BA]/20 text-gray-800 rounded-br-md'
-                  : 'bg-[#B4C7E7]/20 text-gray-800 rounded-bl-md'
+                  ? 'bg-gradient-to-r from-pink-100 to-purple-100 text-gray-800 rounded-br-md'
+                  : 'bg-gradient-to-r from-purple-100 to-blue-100 text-gray-800 rounded-bl-md'
               }`}
             >
               <p className="text-sm leading-relaxed">{message.content}</p>
@@ -163,11 +163,11 @@ export function ChatBot() {
 
         {loading && (
           <div className="flex justify-start">
-            <div className="bg-[#B4C7E7]/20 px-5 py-3 rounded-2xl rounded-bl-md">
+            <div className="bg-gradient-to-r from-purple-100 to-blue-100 px-5 py-3 rounded-2xl rounded-bl-md">
               <div className="flex gap-2">
-                <div className="w-2 h-2 bg-[#B4C7E7] rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                <div className="w-2 h-2 bg-[#B4C7E7] rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                <div className="w-2 h-2 bg-[#B4C7E7] rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                <div className="w-2 h-2 bg-pink-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
               </div>
             </div>
           </div>
@@ -184,13 +184,13 @@ export function ChatBot() {
             onChange={(e) => setInput(e.target.value)}
             onKeyPress={handleKeyPress}
             placeholder="Share what's on your mind..."
-            className="flex-1 px-5 py-3 bg-white border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#A8D5BA] focus:border-transparent transition-all text-sm"
+            className="flex-1 px-5 py-3 bg-white border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-pink-400 focus:border-transparent transition-all text-sm active:scale-[0.99]"
             disabled={loading}
           />
           <button
             onClick={handleSend}
             disabled={!input.trim() || loading}
-            className="px-6 py-3 bg-gradient-to-r from-[#A8D5BA] to-[#B4C7E7] text-white rounded-2xl hover:shadow-lg transform hover:-translate-y-0.5 transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:transform-none"
+            className="px-6 py-3 bg-gradient-to-r from-pink-500 via-purple-500 to-blue-500 text-white rounded-2xl hover:shadow-lg transform hover:-translate-y-0.5 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:transform-none"
           >
             <Send className="w-5 h-5" />
           </button>

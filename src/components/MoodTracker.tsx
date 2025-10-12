@@ -68,7 +68,7 @@ export function MoodTracker() {
     <div className="bg-white rounded-3xl shadow-lg border border-gray-100 p-6">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-gradient-to-br from-[#B4C7E7] to-[#A8D5BA] rounded-xl flex items-center justify-center">
+          <div className="w-10 h-10 bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 rounded-xl flex items-center justify-center">
             <SmilePlus className="w-5 h-5 text-white" />
           </div>
           <h3 className="text-lg font-semibold text-gray-800">Mood Tracker</h3>
@@ -76,7 +76,7 @@ export function MoodTracker() {
         {!showForm && (
           <button
             onClick={() => setShowForm(true)}
-            className="text-sm font-medium text-[#A8D5BA] hover:text-[#B4C7E7] transition-colors"
+            className="text-sm font-medium text-pink-500 hover:text-purple-500 transition-colors active:scale-95"
           >
             Log Mood
           </button>
@@ -95,9 +95,9 @@ export function MoodTracker() {
                   <button
                     key={mood.value}
                     onClick={() => setSelectedMood(mood.value)}
-                    className={`flex-1 flex flex-col items-center gap-2 p-3 rounded-2xl transition-all ${
+                    className={`flex-1 flex flex-col items-center gap-2 p-3 rounded-2xl transition-all active:scale-95 ${
                       isSelected
-                        ? 'bg-gradient-to-br from-[#A8D5BA]/20 to-[#B4C7E7]/20 shadow-md'
+                        ? 'bg-gradient-to-br from-pink-100 to-purple-100 shadow-md'
                         : 'bg-gray-50 hover:bg-gray-100'
                     }`}
                   >
@@ -120,7 +120,7 @@ export function MoodTracker() {
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="What's contributing to this mood?"
-              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#A8D5BA] focus:border-transparent text-sm resize-none"
+              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400 focus:border-transparent text-sm resize-none active:scale-[0.99]"
               rows={3}
             />
           </div>
@@ -132,14 +132,14 @@ export function MoodTracker() {
                 setSelectedMood(null);
                 setNotes('');
               }}
-              className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors text-sm font-medium"
+              className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors text-sm font-medium active:scale-95"
             >
               Cancel
             </button>
             <button
               onClick={saveMood}
               disabled={selectedMood === null}
-              className="flex-1 px-4 py-2 bg-gradient-to-r from-[#A8D5BA] to-[#B4C7E7] text-white rounded-xl hover:shadow-md transition-all disabled:opacity-40 disabled:cursor-not-allowed text-sm font-medium"
+              className="flex-1 px-4 py-2 bg-gradient-to-r from-pink-500 via-purple-500 to-blue-500 text-white rounded-xl hover:shadow-md transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed text-sm font-medium"
             >
               Save Mood
             </button>
@@ -148,7 +148,7 @@ export function MoodTracker() {
       ) : (
         <div className="space-y-4">
           {recentMoods.length > 0 && (
-            <div className="bg-gradient-to-br from-[#B4C7E7]/10 to-[#A8D5BA]/10 rounded-2xl p-4">
+            <div className="bg-gradient-to-br from-blue-100 to-pink-100 rounded-2xl p-4">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs text-gray-600 mb-1">7-Day Average</p>

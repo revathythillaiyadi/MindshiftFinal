@@ -65,24 +65,24 @@ export function ProgressTracker() {
   return (
     <div className="bg-white rounded-3xl shadow-lg border border-gray-100 p-6 space-y-6">
       <div className="flex items-center gap-3">
-        <div className="w-10 h-10 bg-gradient-to-br from-[#A8D5BA] to-[#B4C7E7] rounded-xl flex items-center justify-center">
+        <div className="w-10 h-10 bg-gradient-to-br from-pink-500 via-purple-500 to-blue-500 rounded-xl flex items-center justify-center">
           <TrendingUp className="w-5 h-5 text-white" />
         </div>
         <h3 className="text-lg font-semibold text-gray-800">Your Progress</h3>
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-        <div className="bg-gradient-to-br from-[#A8D5BA]/10 to-[#A8D5BA]/5 rounded-2xl p-4">
+        <div className="bg-gradient-to-br from-pink-100 to-pink-50 rounded-2xl p-4 cursor-pointer hover:shadow-md transition-all active:scale-[0.98]">
           <div className="flex items-center gap-2 mb-2">
-            <MessageCircle className="w-4 h-4 text-[#A8D5BA]" />
+            <MessageCircle className="w-4 h-4 text-pink-500" />
             <span className="text-xs font-medium text-gray-600">Reflections</span>
           </div>
           <p className="text-2xl font-bold text-gray-800">{stats.totalMessages}</p>
         </div>
 
-        <div className="bg-gradient-to-br from-[#B4C7E7]/10 to-[#B4C7E7]/5 rounded-2xl p-4">
+        <div className="bg-gradient-to-br from-blue-100 to-blue-50 rounded-2xl p-4 cursor-pointer hover:shadow-md transition-all active:scale-[0.98]">
           <div className="flex items-center gap-2 mb-2">
-            <SmilePlus className="w-4 h-4 text-[#B4C7E7]" />
+            <SmilePlus className="w-4 h-4 text-blue-500" />
             <span className="text-xs font-medium text-gray-600">Mood Logs</span>
           </div>
           <p className="text-2xl font-bold text-gray-800">{stats.totalMoods}</p>
@@ -102,10 +102,10 @@ export function ProgressTracker() {
               <div key={index} className="flex-1 flex flex-col items-center gap-2">
                 <div className="relative w-full h-20 flex items-end">
                   <div
-                    className={`w-full rounded-lg transition-all ${
+                    className={`w-full rounded-lg transition-all hover:scale-105 cursor-pointer ${
                       isToday
-                        ? 'bg-gradient-to-t from-[#A8D5BA] to-[#B4C7E7]'
-                        : 'bg-gradient-to-t from-[#A8D5BA]/40 to-[#B4C7E7]/40'
+                        ? 'bg-gradient-to-t from-pink-500 via-purple-500 to-blue-500'
+                        : 'bg-gradient-to-t from-pink-300 via-purple-300 to-blue-300 opacity-60'
                     }`}
                     style={{ height: `${Math.max(height, 8)}%` }}
                   >
@@ -116,7 +116,7 @@ export function ProgressTracker() {
                     )}
                   </div>
                 </div>
-                <span className={`text-xs font-medium ${isToday ? 'text-[#A8D5BA]' : 'text-gray-400'}`}>
+                <span className={`text-xs font-medium ${isToday ? 'text-pink-500' : 'text-gray-400'}`}>
                   {days[index]}
                 </span>
               </div>
