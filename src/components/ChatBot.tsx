@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Send, Brain } from 'lucide-react';
+import { Send, Brain, Mic, MicOff, Volume2, VolumeX } from 'lucide-react';
 import { supabase, ChatMessage } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -15,13 +15,46 @@ export function ChatBot() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [voiceEnabled, setVoiceEnabled] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const recognitionRef = useRef<any>(null);
   const { user } = useAuth();
 
   useEffect(() => {
     if (user) {
       loadMessages();
     }
+
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      recognitionRef.current = new SpeechRecognition();
+      recognitionRef.current.continuous = false;
+      recognitionRef.current.interimResults = false;
+      recognitionRef.current.lang = 'en-US';
+
+      recognitionRef.current.onresult = (event: any) => {
+        const transcript = event.results[0][0].transcript;
+        setInput(transcript);
+        setIsRecording(false);
+      };
+
+      recognitionRef.current.onerror = () => {
+        setIsRecording(false);
+      };
+
+      recognitionRef.current.onend = () => {
+        setIsRecording(false);
+      };
+    }
+
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+      window.speechSynthesis.cancel();
+    };
   }, [user]);
 
   useEffect(() => {
@@ -110,6 +143,10 @@ export function ChatBot() {
       });
 
       setLoading(false);
+
+      if (voiceEnabled) {
+        speakText(responseContent);
+      }
     }, 1000);
   };
 
@@ -120,17 +157,67 @@ export function ChatBot() {
     }
   };
 
+  const startVoiceRecording = () => {
+    if (recognitionRef.current && !isRecording) {
+      try {
+        setIsRecording(true);
+        recognitionRef.current.start();
+      } catch (error) {
+        console.error('Voice recognition error:', error);
+        setIsRecording(false);
+      }
+    }
+  };
+
+  const stopVoiceRecording = () => {
+    if (recognitionRef.current && isRecording) {
+      recognitionRef.current.stop();
+      setIsRecording(false);
+    }
+  };
+
+  const speakText = (text: string) => {
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 0.9;
+    utterance.pitch = 1;
+    utterance.volume = 1;
+
+    utterance.onstart = () => setIsSpeaking(true);
+    utterance.onend = () => setIsSpeaking(false);
+    utterance.onerror = () => setIsSpeaking(false);
+
+    window.speechSynthesis.speak(utterance);
+  };
+
+  const stopSpeaking = () => {
+    window.speechSynthesis.cancel();
+    setIsSpeaking(false);
+  };
+
   return (
     <div className="flex flex-col h-full bg-white rounded-3xl shadow-lg border border-gray-100 overflow-hidden">
       <div className="bg-gradient-to-r from-pink-500 via-purple-500 to-blue-500 p-6">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center animate-pulse">
-            <Brain className="w-5 h-5 text-white" />
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className={`w-10 h-10 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center ${isSpeaking ? 'animate-pulse' : ''}`}>
+              <Brain className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h2 className="text-xl font-semibold text-white">Mindshift Assistant</h2>
+              <p className="text-sm text-white/80">{isSpeaking ? 'Speaking...' : 'Here to help you reframe your thoughts'}</p>
+            </div>
           </div>
-          <div>
-            <h2 className="text-xl font-semibold text-white">Mindshift Assistant</h2>
-            <p className="text-sm text-white/80">Here to help you reframe your thoughts</p>
-          </div>
+          <button
+            onClick={() => {
+              setVoiceEnabled(!voiceEnabled);
+              if (isSpeaking) stopSpeaking();
+            }}
+            className="w-10 h-10 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-white/30 transition-all active:scale-95"
+            title={voiceEnabled ? 'Disable voice' : 'Enable voice'}
+          >
+            {voiceEnabled ? <Volume2 className="w-5 h-5 text-white" /> : <VolumeX className="w-5 h-5 text-white" />}
+          </button>
         </div>
       </div>
 
@@ -183,10 +270,22 @@ export function ChatBot() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyPress={handleKeyPress}
-            placeholder="Share what's on your mind..."
+            placeholder={isRecording ? "Listening..." : "Share what's on your mind..."}
             className="flex-1 px-5 py-3 bg-white border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-pink-400 focus:border-transparent transition-all text-sm active:scale-[0.99]"
-            disabled={loading}
+            disabled={loading || isRecording}
           />
+          <button
+            onClick={isRecording ? stopVoiceRecording : startVoiceRecording}
+            disabled={loading}
+            className={`px-6 py-3 rounded-2xl hover:shadow-lg transform hover:-translate-y-0.5 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:transform-none ${
+              isRecording
+                ? 'bg-red-500 text-white animate-pulse'
+                : 'bg-white border-2 border-pink-500 text-pink-500'
+            }`}
+            title={isRecording ? 'Stop recording' : 'Start voice input'}
+          >
+            {isRecording ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+          </button>
           <button
             onClick={handleSend}
             disabled={!input.trim() || loading}
