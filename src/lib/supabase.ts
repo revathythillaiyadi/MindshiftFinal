@@ -22,6 +22,7 @@ export type ChatSession = {
   id: string;
   user_id: string;
   title: string;
+  journal_mode: 'reframe' | 'journal';
   created_at: string;
   updated_at: string;
 };
@@ -33,6 +34,7 @@ export type ChatMessage = {
   role: 'user' | 'assistant';
   content: string;
   reframed_content: string | null;
+  is_journal_entry: boolean;
   created_at: string;
 };
 

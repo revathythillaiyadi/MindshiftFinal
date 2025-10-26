@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Send, Brain, Mic, MicOff, Volume2, VolumeX, Plus, MessageSquare, Settings, History, Trash2, Palette, Smile } from 'lucide-react';
+import { Send, Brain, Mic, MicOff, Volume2, VolumeX, Plus, MessageSquare, Settings, History, Trash2, Palette, Smile, BookOpen } from 'lucide-react';
 import { supabase, ChatMessage, ChatSession } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -9,6 +9,23 @@ const reframingPrompts = [
   "Thank you for sharing. How might this challenge be helping you grow?",
   "I understand. What would you tell a friend going through something similar?",
   "That's tough. What strength are you discovering in yourself through this?",
+];
+
+const journalStartPrompts = [
+  "What are three feelings that have been present for you today, and where do you feel them in your body?",
+  "Describe one interaction today that lingered in your mind, and what unsaid thing made it stick.",
+  "If this day had a color and a texture, what would they be, and why?",
+  "What's something you noticed today that you usually overlook?",
+  "Write about a moment today when you felt most like yourself.",
+];
+
+const reflectiveResponses = [
+  "I see.",
+  "Mmm.",
+  "Tell me more about that.",
+  "I hear you.",
+  "Go on.",
+  "That sounds important.",
 ];
 
 type VoiceOption = {
@@ -45,6 +62,7 @@ export function ChatBot() {
   const [emojiEnabled, setEmojiEnabled] = useState(true);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [customBackgrounds, setCustomBackgrounds] = useState<string[]>([]);
+  const [journalMode, setJournalMode] = useState<'reframe' | 'journal'>('reframe');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
   const { user, profile } = useAuth();
@@ -120,8 +138,12 @@ export function ChatBot() {
   useEffect(() => {
     if (currentSessionId) {
       loadMessages(currentSessionId);
+      const session = sessions.find(s => s.id === currentSessionId);
+      if (session) {
+        setJournalMode(session.journal_mode || 'reframe');
+      }
     }
-  }, [currentSessionId]);
+  }, [currentSessionId, sessions]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -159,14 +181,15 @@ export function ChatBot() {
     }
   };
 
-  const createNewSession = async () => {
+  const createNewSession = async (mode: 'reframe' | 'journal' = 'reframe') => {
     if (!user) return;
 
     const { data, error } = await supabase
       .from('chat_sessions')
       .insert({
         user_id: user.id,
-        title: 'New Chat',
+        title: mode === 'journal' ? 'Journal Entry' : 'New Chat',
+        journal_mode: mode,
       })
       .select()
       .single();
@@ -175,6 +198,33 @@ export function ChatBot() {
       setSessions(prev => [data, ...prev]);
       setCurrentSessionId(data.id);
       setMessages([]);
+      setJournalMode(mode);
+
+      if (mode === 'journal') {
+        const prompt = journalStartPrompts[Math.floor(Math.random() * journalStartPrompts.length)];
+        setTimeout(async () => {
+          const assistantMsg: ChatMessage = {
+            id: crypto.randomUUID(),
+            user_id: user.id,
+            session_id: data.id,
+            role: 'assistant',
+            content: prompt,
+            reframed_content: null,
+            is_journal_entry: true,
+            created_at: new Date().toISOString(),
+          };
+
+          setMessages([assistantMsg]);
+
+          await supabase.from('chat_messages').insert({
+            user_id: user.id,
+            session_id: data.id,
+            role: 'assistant',
+            content: prompt,
+            is_journal_entry: true,
+          });
+        }, 500);
+      }
     }
   };
 
@@ -236,6 +286,48 @@ export function ChatBot() {
     return reframingPrompts[Math.floor(Math.random() * reframingPrompts.length)];
   };
 
+  const generateJournalResponse = (userMessage: string, messageHistory: ChatMessage[]): string => {
+    const lowerMessage = userMessage.toLowerCase();
+    const userMessageCount = messageHistory.filter(m => m.role === 'user').length;
+
+    if (lowerMessage.includes('advice') || lowerMessage.includes('help me') || lowerMessage.includes('what should')) {
+      return "I hear you, but in this mode, I'm simply here to listen without suggesting anything. We can go to the 'Reframe Mode' if you'd like an exercise.";
+    }
+
+    const words = userMessage.split(' ').length;
+
+    if (words < 5) {
+      return reflectiveResponses[Math.floor(Math.random() * reflectiveResponses.length)];
+    }
+
+    const sentences = userMessage.split(/[.!?]+/).filter(s => s.trim().length > 0);
+    const lastSentences = sentences.slice(-2).join('. ');
+
+    if (lowerMessage.includes('feel') || lowerMessage.includes('felt')) {
+      const emotionWords = ['frustrated', 'anxious', 'excited', 'sad', 'happy', 'angry', 'overwhelmed', 'grateful', 'confused'];
+      const detectedEmotion = emotionWords.find(e => lowerMessage.includes(e));
+      if (detectedEmotion) {
+        return `It sounds like you're feeling a lot of ${detectedEmotion} over that.`;
+      }
+      return "I hear the emotion in what you're sharing.";
+    }
+
+    if (userMessageCount > 3 && Math.random() > 0.7) {
+      return reflectiveResponses[Math.floor(Math.random() * reflectiveResponses.length)];
+    }
+
+    const summaryStarters = [
+      "So ",
+      "It sounds like ",
+      "What I'm hearing is ",
+    ];
+
+    const starter = summaryStarters[Math.floor(Math.random() * summaryStarters.length)];
+    const summary = lastSentences.toLowerCase().replace(/^i /g, 'you ').replace(/ i /g, ' you ').replace(/ me /g, ' you ');
+
+    return `${starter}${summary}`;
+  };
+
   const handleSend = async () => {
     if (!input.trim() || !user || loading || !currentSessionId) return;
 
@@ -250,6 +342,7 @@ export function ChatBot() {
       role: 'user',
       content: userMessage,
       reframed_content: null,
+      is_journal_entry: journalMode === 'journal',
       created_at: new Date().toISOString(),
     };
 
@@ -260,15 +353,18 @@ export function ChatBot() {
       session_id: currentSessionId,
       role: 'user',
       content: userMessage,
+      is_journal_entry: journalMode === 'journal',
     }).select().single();
 
     const session = sessions.find(s => s.id === currentSessionId);
-    if (session && session.title === 'New Chat') {
+    if (session && (session.title === 'New Chat' || session.title === 'Journal Entry')) {
       updateSessionTitle(currentSessionId, userMessage);
     }
 
     setTimeout(async () => {
-      const responseContent = generateReframingResponse(userMessage);
+      const responseContent = journalMode === 'journal'
+        ? generateJournalResponse(userMessage, messages)
+        : generateReframingResponse(userMessage);
 
       const assistantMsg: ChatMessage = {
         id: crypto.randomUUID(),
@@ -277,6 +373,7 @@ export function ChatBot() {
         role: 'assistant',
         content: responseContent,
         reframed_content: null,
+        is_journal_entry: journalMode === 'journal',
         created_at: new Date().toISOString(),
       };
 
@@ -287,6 +384,7 @@ export function ChatBot() {
         session_id: currentSessionId,
         role: 'assistant',
         content: responseContent,
+        is_journal_entry: journalMode === 'journal',
       });
 
       await supabase
@@ -296,7 +394,7 @@ export function ChatBot() {
 
       setLoading(false);
 
-      if (voiceEnabled) {
+      if (voiceEnabled && journalMode === 'reframe') {
         speakText(responseContent);
       }
     }, 1000);
@@ -621,18 +719,27 @@ export function ChatBot() {
   return (
     <div className="flex h-full bg-white rounded-3xl shadow-lg border border-gray-100 overflow-hidden">
       <div className={`${showSidebar ? 'w-64' : 'w-16'} bg-gray-50 border-r border-gray-200 transition-all duration-300 flex flex-col`}>
-        <div className="p-4 border-b border-gray-200">
+        <div className="p-4 border-b border-gray-200 space-y-2">
           {showSidebar ? (
-            <button
-              onClick={createNewSession}
-              className="w-full flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-pink-500 via-purple-500 to-blue-500 text-white rounded-xl hover:shadow-lg transition-all active:scale-95 text-sm font-medium"
-            >
-              <Plus className="w-4 h-4" />
-              <span>New Chat</span>
-            </button>
+            <>
+              <button
+                onClick={() => createNewSession('reframe')}
+                className="w-full flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-pink-500 via-purple-500 to-blue-500 text-white rounded-xl hover:shadow-lg transition-all active:scale-95 text-sm font-medium"
+              >
+                <Brain className="w-4 h-4" />
+                <span>Reframe Mode</span>
+              </button>
+              <button
+                onClick={() => createNewSession('journal')}
+                className="w-full flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 text-white rounded-xl hover:shadow-lg transition-all active:scale-95 text-sm font-medium"
+              >
+                <BookOpen className="w-4 h-4" />
+                <span>Journal Mode</span>
+              </button>
+            </>
           ) : (
             <button
-              onClick={createNewSession}
+              onClick={() => createNewSession('reframe')}
               className="w-full flex items-center justify-center p-2 bg-gradient-to-r from-pink-500 via-purple-500 to-blue-500 text-white rounded-xl hover:shadow-lg transition-all active:scale-95"
               title="New Chat"
             >
@@ -1082,27 +1189,35 @@ export function ChatBot() {
           </div>
         ) : (
           <>
-            <div className="bg-gradient-to-r from-pink-500 via-purple-500 to-blue-500 p-6">
+            <div className={`p-6 ${journalMode === 'journal' ? 'bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500' : 'bg-gradient-to-r from-pink-500 via-purple-500 to-blue-500'}`}>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className={`w-10 h-10 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center ${isSpeaking ? 'animate-pulse' : ''}`}>
-                    <Brain className="w-5 h-5 text-white" />
+                    {journalMode === 'journal' ? <BookOpen className="w-5 h-5 text-white" /> : <Brain className="w-5 h-5 text-white" />}
                   </div>
                   <div>
-                    <h2 className="text-xl font-semibold text-white">Mindshift Assistant</h2>
-                    <p className="text-sm text-white/80">{isSpeaking ? 'Speaking...' : 'Here to help you reframe your thoughts'}</p>
+                    <h2 className="text-xl font-semibold text-white">
+                      {journalMode === 'journal' ? 'Journal Mode' : 'Mindshift Assistant'}
+                    </h2>
+                    <p className="text-sm text-white/80">
+                      {journalMode === 'journal'
+                        ? 'A safe space to express your thoughts'
+                        : isSpeaking ? 'Speaking...' : 'Here to help you reframe your thoughts'}
+                    </p>
                   </div>
                 </div>
-                <button
-                  onClick={() => {
-                    updateVoiceEnabled(!voiceEnabled);
-                    if (isSpeaking) stopSpeaking();
-                  }}
-                  className="w-10 h-10 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-white/30 transition-all active:scale-95"
-                  title={voiceEnabled ? 'Disable voice' : 'Enable voice'}
-                >
-                  {voiceEnabled ? <Volume2 className="w-5 h-5 text-white" /> : <VolumeX className="w-5 h-5 text-white" />}
-                </button>
+                {journalMode === 'reframe' && (
+                  <button
+                    onClick={() => {
+                      updateVoiceEnabled(!voiceEnabled);
+                      if (isSpeaking) stopSpeaking();
+                    }}
+                    className="w-10 h-10 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-white/30 transition-all active:scale-95"
+                    title={voiceEnabled ? 'Disable voice' : 'Enable voice'}
+                  >
+                    {voiceEnabled ? <Volume2 className="w-5 h-5 text-white" /> : <VolumeX className="w-5 h-5 text-white" />}
+                  </button>
+                )}
               </div>
             </div>
 
