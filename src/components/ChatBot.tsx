@@ -324,11 +324,23 @@ export function ChatBot() {
       const voice = availableVoices.find(v => v.name === selectedVoice);
       if (voice) {
         utterance.voice = voice;
+
+        if (voice.name.toLowerCase().includes('male') || voice.name.toLowerCase().includes('james')) {
+          utterance.rate = 0.9;
+          utterance.pitch = 0.95;
+        } else if (voice.name.toLowerCase().includes('child') || voice.name.toLowerCase().includes('junior') || voice.name.toLowerCase().includes('alex')) {
+          utterance.rate = 0.95;
+          utterance.pitch = 1.3;
+        } else {
+          utterance.rate = 0.85;
+          utterance.pitch = 1.05;
+        }
       }
+    } else {
+      utterance.rate = 0.85;
+      utterance.pitch = 1.05;
     }
 
-    utterance.rate = 0.85;
-    utterance.pitch = 1.05;
     utterance.volume = 1;
 
     utterance.onstart = () => setIsSpeaking(true);
