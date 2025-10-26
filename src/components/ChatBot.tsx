@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Send, Brain, Mic, MicOff, Volume2, VolumeX, Plus, MessageSquare, Settings, History, Trash2, Palette, Smile, BookOpen } from 'lucide-react';
+import { Send, Brain, Mic, MicOff, Plus, MessageSquare, Settings, History, Trash2, Palette, Smile, BookOpen, Music, Waves } from 'lucide-react';
 import { supabase, ChatMessage, ChatSession } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { Journal } from './Journal';
@@ -64,6 +64,10 @@ export function ChatBot() {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [customBackgrounds, setCustomBackgrounds] = useState<string[]>([]);
   const [journalMode, setJournalMode] = useState<'reframe' | 'journal'>('reframe');
+  const [ambientSound, setAmbientSound] = useState<string | null>(null);
+  const [ambientVolume, setAmbientVolume] = useState(0.5);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
   const { user, profile } = useAuth();
@@ -483,6 +487,62 @@ export function ChatBot() {
   const stopSpeaking = () => {
     window.speechSynthesis.cancel();
     setIsSpeaking(false);
+  };
+
+  const playAmbientSound = (soundId: string | null) => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+
+    if (!soundId) {
+      setAmbientSound(null);
+      setIsPlaying(false);
+      return;
+    }
+
+    const soundMap: Record<string, string> = {
+      'rain': 'https://cdn.pixabay.com/audio/2022/03/15/audio_c7b77f2b56.mp3',
+      'ocean': 'https://cdn.pixabay.com/audio/2022/03/10/audio_bef04bc81e.mp3',
+      'forest': 'https://cdn.pixabay.com/audio/2022/03/15/audio_57253c8f8e.mp3',
+      'river': 'https://cdn.pixabay.com/audio/2022/03/15/audio_e9cf394eec.mp3',
+      'fireplace': 'https://cdn.pixabay.com/audio/2022/03/15/audio_b5c70e6f08.mp3',
+      'wind': 'https://cdn.pixabay.com/audio/2022/03/15/audio_4c8a8c8f88.mp3',
+      'birds': 'https://cdn.pixabay.com/audio/2022/03/15/audio_c35f1e6f7f.mp3',
+      'meditation': 'https://cdn.pixabay.com/audio/2022/03/15/audio_d5e4e9d3b4.mp3',
+      'piano': 'https://cdn.pixabay.com/audio/2022/03/15/audio_a4f4c8e4f4.mp3',
+      'ambient': 'https://cdn.pixabay.com/audio/2022/03/15/audio_c7f8e4f4f4.mp3',
+    };
+
+    const audio = new Audio(soundMap[soundId]);
+    audio.loop = true;
+    audio.volume = ambientVolume;
+    audio.play().then(() => {
+      audioRef.current = audio;
+      setAmbientSound(soundId);
+      setIsPlaying(true);
+    }).catch(error => {
+      console.error('Error playing sound:', error);
+    });
+  };
+
+  const updateAmbientVolume = (volume: number) => {
+    setAmbientVolume(volume);
+    if (audioRef.current) {
+      audioRef.current.volume = volume;
+    }
+  };
+
+  const togglePlayPause = () => {
+    if (!audioRef.current) return;
+
+    if (isPlaying) {
+      audioRef.current.pause();
+      setIsPlaying(false);
+    } else {
+      audioRef.current.play();
+      setIsPlaying(true);
+    }
   };
 
   const updateChatBackground = async (background: string) => {
@@ -1025,6 +1085,115 @@ export function ChatBot() {
                 </div>
 
                 <div className="bg-gray-50 rounded-2xl p-6">
+                  <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                    <Music className="w-5 h-5 text-blue-600" />
+                    Ambient Sounds
+                  </h3>
+
+                  <div className="space-y-4">
+                    <p className="text-sm text-gray-600">
+                      Play soothing background sounds while journaling or chatting
+                    </p>
+
+                    <div className="space-y-3">
+                      <div>
+                        <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">Nature Sounds</p>
+                        <div className="grid grid-cols-2 gap-2">
+                          {[
+                            { id: 'rain', name: 'Rain', icon: '🌧️' },
+                            { id: 'ocean', name: 'Ocean Waves', icon: '🌊' },
+                            { id: 'forest', name: 'Forest', icon: '🌲' },
+                            { id: 'river', name: 'River', icon: '🏞️' },
+                            { id: 'birds', name: 'Birds', icon: '🐦' },
+                            { id: 'wind', name: 'Wind', icon: '💨' },
+                          ].map((sound) => (
+                            <button
+                              key={sound.id}
+                              onClick={() => playAmbientSound(ambientSound === sound.id ? null : sound.id)}
+                              className={`flex items-center gap-2 p-3 rounded-xl transition-all ${
+                                ambientSound === sound.id
+                                  ? 'bg-gradient-to-r from-blue-100 to-cyan-100 border-2 border-blue-300'
+                                  : 'bg-white hover:bg-gray-50 border border-gray-200'
+                              }`}
+                            >
+                              <span className="text-xl">{sound.icon}</span>
+                              <span className="text-sm font-medium text-gray-800">{sound.name}</span>
+                              {ambientSound === sound.id && (
+                                <div className="ml-auto">
+                                  <Waves className="w-4 h-4 text-blue-500 animate-pulse" />
+                                </div>
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div>
+                        <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">Meditative & Music</p>
+                        <div className="grid grid-cols-2 gap-2">
+                          {[
+                            { id: 'fireplace', name: 'Fireplace', icon: '🔥' },
+                            { id: 'meditation', name: 'Meditation', icon: '🧘' },
+                            { id: 'piano', name: 'Piano', icon: '🎹' },
+                            { id: 'ambient', name: 'Ambient', icon: '🎵' },
+                          ].map((sound) => (
+                            <button
+                              key={sound.id}
+                              onClick={() => playAmbientSound(ambientSound === sound.id ? null : sound.id)}
+                              className={`flex items-center gap-2 p-3 rounded-xl transition-all ${
+                                ambientSound === sound.id
+                                  ? 'bg-gradient-to-r from-purple-100 to-pink-100 border-2 border-purple-300'
+                                  : 'bg-white hover:bg-gray-50 border border-gray-200'
+                              }`}
+                            >
+                              <span className="text-xl">{sound.icon}</span>
+                              <span className="text-sm font-medium text-gray-800">{sound.name}</span>
+                              {ambientSound === sound.id && (
+                                <div className="ml-auto">
+                                  <Music className="w-4 h-4 text-purple-500 animate-pulse" />
+                                </div>
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {ambientSound && (
+                      <div className="mt-4 p-4 bg-white rounded-xl border border-gray-200">
+                        <div className="flex items-center justify-between mb-3">
+                          <span className="text-sm font-medium text-gray-700">Volume</span>
+                          <span className="text-sm text-gray-500">{Math.round(ambientVolume * 100)}%</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="1"
+                          step="0.05"
+                          value={ambientVolume}
+                          onChange={(e) => updateAmbientVolume(parseFloat(e.target.value))}
+                          className="w-full accent-blue-500"
+                        />
+                        <div className="flex gap-2 mt-3">
+                          <button
+                            onClick={togglePlayPause}
+                            className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-all text-sm font-medium"
+                          >
+                            {isPlaying ? 'Pause' : 'Play'}
+                          </button>
+                          <button
+                            onClick={() => playAmbientSound(null)}
+                            className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-all text-sm font-medium"
+                          >
+                            Stop
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="bg-gray-50 rounded-2xl p-6">
                   <h3 className="text-lg font-semibold text-gray-800 mb-4">Chat Appearance</h3>
 
                   <div className="space-y-4">
@@ -1286,16 +1455,17 @@ export function ChatBot() {
                     </p>
                   </div>
                 </div>
-                {journalMode === 'reframe' && (
+                {journalMode === 'reframe' && currentSessionId && (
                   <button
                     onClick={() => {
-                      updateVoiceEnabled(!voiceEnabled);
-                      if (isSpeaking) stopSpeaking();
+                      if (confirm('Delete this conversation? This action cannot be undone.')) {
+                        deleteSession(currentSessionId);
+                      }
                     }}
-                    className="w-10 h-10 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-white/30 transition-all active:scale-95"
-                    title={voiceEnabled ? 'Disable voice' : 'Enable voice'}
+                    className="w-10 h-10 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-red-500/30 transition-all active:scale-95"
+                    title="Delete conversation"
                   >
-                    {voiceEnabled ? <Volume2 className="w-5 h-5 text-white" /> : <VolumeX className="w-5 h-5 text-white" />}
+                    <Trash2 className="w-5 h-5 text-white" />
                   </button>
                 )}
               </div>
