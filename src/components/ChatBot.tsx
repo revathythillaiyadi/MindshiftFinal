@@ -184,8 +184,10 @@ export function ChatBot() {
     if (data && data.length > 0) {
       setSessions(data);
       setCurrentSessionId(data[0].id);
+      setCurrentView('chat');
     } else {
-      createNewSession();
+      setSessions([]);
+      setCurrentView('mode-select');
     }
   };
 
@@ -222,6 +224,7 @@ export function ChatBot() {
       setCurrentSessionId(data.id);
       setMessages([]);
       setJournalMode(mode);
+      setCurrentView('chat');
 
       if (mode === 'journal') {
         const prompt = journalStartPrompts[Math.floor(Math.random() * journalStartPrompts.length)];
@@ -277,10 +280,12 @@ export function ChatBot() {
     if (currentSessionId === sessionId) {
       if (updatedSessions.length > 0) {
         setCurrentSessionId(updatedSessions[0].id);
+        loadMessages(updatedSessions[0].id);
+        setCurrentView('chat');
       } else {
         setCurrentSessionId(null);
         setMessages([]);
-        createNewSession();
+        setCurrentView('mode-select');
       }
     }
   };
@@ -590,28 +595,39 @@ Can you tell me one thing you need me to know about your feelings right now?`;
     }
 
     const soundMap: Record<string, string> = {
-      'rain': 'https://cdn.pixabay.com/audio/2022/03/15/audio_c7b77f2b56.mp3',
-      'ocean': 'https://cdn.pixabay.com/audio/2022/03/10/audio_bef04bc81e.mp3',
-      'forest': 'https://cdn.pixabay.com/audio/2022/03/15/audio_57253c8f8e.mp3',
-      'river': 'https://cdn.pixabay.com/audio/2022/03/15/audio_e9cf394eec.mp3',
-      'fireplace': 'https://cdn.pixabay.com/audio/2022/03/15/audio_b5c70e6f08.mp3',
-      'wind': 'https://cdn.pixabay.com/audio/2022/03/15/audio_4c8a8c8f88.mp3',
-      'birds': 'https://cdn.pixabay.com/audio/2022/03/15/audio_c35f1e6f7f.mp3',
-      'meditation': 'https://cdn.pixabay.com/audio/2022/03/15/audio_d5e4e9d3b4.mp3',
-      'piano': 'https://cdn.pixabay.com/audio/2022/03/15/audio_a4f4c8e4f4.mp3',
-      'ambient': 'https://cdn.pixabay.com/audio/2022/03/15/audio_c7f8e4f4f4.mp3',
+      'rain': 'https://cdn.pixabay.com/download/audio/2022/03/15/audio_c7b77f2b56.mp3',
+      'ocean': 'https://cdn.pixabay.com/download/audio/2022/03/10/audio_bef04bc81e.mp3',
+      'forest': 'https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3',
+      'river': 'https://cdn.pixabay.com/download/audio/2022/03/24/audio_4a8c50a527.mp3',
+      'fireplace': 'https://cdn.pixabay.com/download/audio/2022/03/15/audio_5c73a3ed59.mp3',
+      'wind': 'https://cdn.pixabay.com/download/audio/2022/03/15/audio_9c60632bb4.mp3',
+      'birds': 'https://cdn.pixabay.com/download/audio/2022/03/09/audio_d1718ab41b.mp3',
+      'meditation': 'https://cdn.pixabay.com/download/audio/2021/08/04/audio_0625c1539c.mp3',
+      'piano': 'https://cdn.pixabay.com/download/audio/2022/01/18/audio_d1718ab41b.mp3',
+      'ambient': 'https://cdn.pixabay.com/download/audio/2022/08/02/audio_884fe92c21.mp3',
     };
 
     const audio = new Audio(soundMap[soundId]);
     audio.loop = true;
     audio.volume = ambientVolume;
-    audio.play().then(() => {
-      audioRef.current = audio;
-      setAmbientSound(soundId);
-      setIsPlaying(true);
-    }).catch(error => {
-      console.error('Error playing sound:', error);
+
+    audio.addEventListener('canplaythrough', () => {
+      audio.play().then(() => {
+        audioRef.current = audio;
+        setAmbientSound(soundId);
+        setIsPlaying(true);
+      }).catch(error => {
+        console.error('Error playing sound:', error);
+        alert('Unable to play audio. Please check your browser permissions and internet connection.');
+      });
     });
+
+    audio.addEventListener('error', (e) => {
+      console.error('Error loading sound:', e);
+      alert('Failed to load audio file. Please try another sound.');
+    });
+
+    audio.load();
   };
 
   const updateAmbientVolume = (volume: number) => {
@@ -872,7 +888,7 @@ Can you tell me one thing you need me to know about your feelings right now?`;
     }} />;
   }
 
-  if (currentView === 'mode-select' && sessions.length === 0) {
+  if (currentView === 'mode-select') {
     return (
       <div className="flex h-full bg-white rounded-3xl shadow-lg border border-gray-100 overflow-hidden">
         <div className="flex-1 flex flex-col items-center justify-center p-8">
