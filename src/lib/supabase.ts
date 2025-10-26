@@ -23,6 +23,8 @@ export type ChatSession = {
   user_id: string;
   title: string;
   journal_mode: 'reframe' | 'journal';
+  summary: string | null;
+  entry_date: string | null;
   created_at: string;
   updated_at: string;
 };

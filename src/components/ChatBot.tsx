@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Send, Brain, Mic, MicOff, Volume2, VolumeX, Plus, MessageSquare, Settings, History, Trash2, Palette, Smile, BookOpen } from 'lucide-react';
 import { supabase, ChatMessage, ChatSession } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { Journal } from './Journal';
 
 const reframingPrompts = [
   "That sounds challenging. What might be a different way to look at this situation?",
@@ -715,6 +716,10 @@ export function ChatBot() {
     '💖', '💕', '💗', '💝', '🎉', '🎊', '🎈', '🔥',
     '👍', '👏', '🤝', '💯', '✅', '⭐', '🏆', '🎯'
   ];
+
+  if (journalMode === 'journal') {
+    return <Journal />;
+  }
 
   return (
     <div className="flex h-full bg-white rounded-3xl shadow-lg border border-gray-100 overflow-hidden">
