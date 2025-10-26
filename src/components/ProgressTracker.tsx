@@ -24,7 +24,7 @@ export function ProgressTracker() {
   }, [user]);
 
   const loadStats = async () => {
-    if (!user) return;
+    if (!user || !supabase) return;
 
     const { data: messages } = await supabase
       .from('chat_messages')

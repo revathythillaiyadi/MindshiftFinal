@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
-import { Send, Brain, Mic, MicOff, Plus, MessageSquare, Settings, History, Trash2, Palette, Smile, BookOpen, Music, Waves, AlertCircle } from 'lucide-react';
+import { Send, Brain, Mic, MicOff, Plus, MessageSquare, Settings, History, Trash2, Palette, Smile, BookOpen, Music, Waves, AlertCircle, ArrowLeft } from 'lucide-react';
 import { supabase, ChatMessage, ChatSession } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { Journal } from './Journal';
+import { webhookService } from '../lib/webhook';
 
 const CRISIS_KEYWORDS = [
   'kill myself',
@@ -172,6 +173,15 @@ export function ChatBot() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  useEffect(() => {
+    // Cleanup audio when component unmounts
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+    };
+  }, []);
+
   const loadSessions = async () => {
     if (!user) return;
 
@@ -207,32 +217,85 @@ export function ChatBot() {
   };
 
   const createNewSession = async (mode: 'reframe' | 'journal' = 'reframe') => {
+    console.log('createNewSession called with mode:', mode);
     if (!user) return;
 
-    const { data, error } = await supabase
-      .from('chat_sessions')
-      .insert({
+    if (supabase) {
+      console.log('Using Supabase mode');
+      const { data, error } = await supabase
+        .from('chat_sessions')
+        .insert({
+          user_id: user.id,
+          title: mode === 'journal' ? 'Journal Entry' : 'New Chat',
+          journal_mode: mode,
+        })
+        .select()
+        .single();
+
+      if (data && !error) {
+        console.log('Supabase session created:', data);
+        setSessions(prev => [data, ...prev]);
+        setCurrentSessionId(data.id);
+        setMessages([]);
+        setJournalMode(mode);
+        setCurrentView('chat');
+        console.log('Set currentView to chat');
+
+        if (mode === 'journal') {
+          const prompt = journalStartPrompts[Math.floor(Math.random() * journalStartPrompts.length)];
+          setTimeout(async () => {
+            const assistantMsg: ChatMessage = {
+              id: crypto.randomUUID(),
+              user_id: user.id,
+              session_id: data.id,
+              role: 'assistant',
+              content: prompt,
+              reframed_content: null,
+              is_journal_entry: true,
+              created_at: new Date().toISOString(),
+            };
+
+            setMessages([assistantMsg]);
+
+            await supabase.from('chat_messages').insert({
+              user_id: user.id,
+              session_id: data.id,
+              role: 'assistant',
+              content: prompt,
+              is_journal_entry: true,
+            });
+          }, 500);
+        }
+      }
+    } else {
+      console.log('Using demo mode');
+      // Demo mode - create session locally
+      const demoSession: ChatSession = {
+        id: crypto.randomUUID(),
         user_id: user.id,
         title: mode === 'journal' ? 'Journal Entry' : 'New Chat',
         journal_mode: mode,
-      })
-      .select()
-      .single();
+        summary: null,
+        entry_date: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
 
-    if (data && !error) {
-      setSessions(prev => [data, ...prev]);
-      setCurrentSessionId(data.id);
+      console.log('Demo session created:', demoSession);
+      setSessions(prev => [demoSession, ...prev]);
+      setCurrentSessionId(demoSession.id);
       setMessages([]);
       setJournalMode(mode);
       setCurrentView('chat');
+      console.log('Set currentView to chat (demo mode)');
 
       if (mode === 'journal') {
         const prompt = journalStartPrompts[Math.floor(Math.random() * journalStartPrompts.length)];
-        setTimeout(async () => {
+        setTimeout(() => {
           const assistantMsg: ChatMessage = {
             id: crypto.randomUUID(),
             user_id: user.id,
-            session_id: data.id,
+            session_id: demoSession.id,
             role: 'assistant',
             content: prompt,
             reframed_content: null,
@@ -241,14 +304,6 @@ export function ChatBot() {
           };
 
           setMessages([assistantMsg]);
-
-          await supabase.from('chat_messages').insert({
-            user_id: user.id,
-            session_id: data.id,
-            role: 'assistant',
-            content: prompt,
-            is_journal_entry: true,
-          });
         }, 500);
       }
     }
@@ -257,22 +312,24 @@ export function ChatBot() {
   const deleteSession = async (sessionId: string) => {
     if (!user) return;
 
-    const { error } = await supabase
-      .from('chat_sessions')
-      .delete()
-      .eq('id', sessionId)
-      .eq('user_id', user.id);
+    if (supabase) {
+      const { error } = await supabase
+        .from('chat_sessions')
+        .delete()
+        .eq('id', sessionId)
+        .eq('user_id', user.id);
 
-    if (error) {
-      console.error('Error deleting session:', error);
-      return;
+      if (error) {
+        console.error('Error deleting session:', error);
+        return;
+      }
+
+      await supabase
+        .from('chat_messages')
+        .delete()
+        .eq('session_id', sessionId)
+        .eq('user_id', user.id);
     }
-
-    await supabase
-      .from('chat_messages')
-      .delete()
-      .eq('session_id', sessionId)
-      .eq('user_id', user.id);
 
     const updatedSessions = sessions.filter(s => s.id !== sessionId);
     setSessions(updatedSessions);
@@ -293,13 +350,15 @@ export function ChatBot() {
   const updateSessionTitle = async (sessionId: string, firstMessage: string) => {
     const title = firstMessage.slice(0, 50) + (firstMessage.length > 50 ? '...' : '');
 
-    await supabase
-      .from('chat_sessions')
-      .update({
-        title,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', sessionId);
+    if (supabase) {
+      await supabase
+        .from('chat_sessions')
+        .update({
+          title,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', sessionId);
+    }
 
     setSessions(prev => prev.map(s =>
       s.id === sessionId ? { ...s, title, updated_at: new Date().toISOString() } : s
@@ -336,7 +395,7 @@ Can you tell me one thing you need me to know about your feelings right now?`;
 
     setMessages(prev => [...prev, crisisMessage]);
 
-    if (currentSessionId && user) {
+    if (currentSessionId && user && supabase) {
       await supabase.from('chat_messages').insert({
         user_id: user.id,
         session_id: currentSessionId,
@@ -441,13 +500,15 @@ Can you tell me one thing you need me to know about your feelings right now?`;
 
     setMessages(prev => [...prev, userMsg]);
 
-    const { data: insertedMsg } = await supabase.from('chat_messages').insert({
-      user_id: user.id,
-      session_id: currentSessionId,
-      role: 'user',
-      content: userMessage,
-      is_journal_entry: journalMode === 'journal',
-    }).select().single();
+    if (supabase) {
+      const { data: insertedMsg } = await supabase.from('chat_messages').insert({
+        user_id: user.id,
+        session_id: currentSessionId,
+        role: 'user',
+        content: userMessage,
+        is_journal_entry: journalMode === 'journal',
+      }).select().single();
+    }
 
     const session = sessions.find(s => s.id === currentSessionId);
     if (session && (session.title === 'New Chat' || session.title === 'Journal Entry')) {
@@ -477,18 +538,28 @@ Can you tell me one thing you need me to know about your feelings right now?`;
 
       setMessages(prev => [...prev, assistantMsg]);
 
-      await supabase.from('chat_messages').insert({
-        user_id: user.id,
-        session_id: currentSessionId,
-        role: 'assistant',
-        content: responseContent,
-        is_journal_entry: journalMode === 'journal',
-      });
+      if (supabase) {
+        await supabase.from('chat_messages').insert({
+          user_id: user.id,
+          session_id: currentSessionId,
+          role: 'assistant',
+          content: responseContent,
+          is_journal_entry: journalMode === 'journal',
+        });
 
-      await supabase
-        .from('chat_sessions')
-        .update({ updated_at: new Date().toISOString() })
-        .eq('id', currentSessionId);
+        await supabase
+          .from('chat_sessions')
+          .update({ updated_at: new Date().toISOString() })
+          .eq('id', currentSessionId);
+      }
+
+      // Send chat interaction to n8n webhook
+      webhookService.sendChatEvent({
+        message: userMessage,
+        response: responseContent,
+        mode: journalMode,
+        sessionId: currentSessionId,
+      }, user.id);
 
       setLoading(false);
 
@@ -583,8 +654,10 @@ Can you tell me one thing you need me to know about your feelings right now?`;
   };
 
   const playAmbientSound = (soundId: string | null) => {
+    // Stop any currently playing audio
     if (audioRef.current) {
       audioRef.current.pause();
+      audioRef.current.currentTime = 0;
       audioRef.current = null;
     }
 
@@ -594,40 +667,242 @@ Can you tell me one thing you need me to know about your feelings right now?`;
       return;
     }
 
-    const soundMap: Record<string, string> = {
-      'rain': 'https://cdn.pixabay.com/download/audio/2022/03/15/audio_c7b77f2b56.mp3',
-      'ocean': 'https://cdn.pixabay.com/download/audio/2022/03/10/audio_bef04bc81e.mp3',
-      'forest': 'https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3',
-      'river': 'https://cdn.pixabay.com/download/audio/2022/03/24/audio_4a8c50a527.mp3',
-      'fireplace': 'https://cdn.pixabay.com/download/audio/2022/03/15/audio_5c73a3ed59.mp3',
-      'wind': 'https://cdn.pixabay.com/download/audio/2022/03/15/audio_9c60632bb4.mp3',
-      'birds': 'https://cdn.pixabay.com/download/audio/2022/03/09/audio_d1718ab41b.mp3',
-      'meditation': 'https://cdn.pixabay.com/download/audio/2021/08/04/audio_0625c1539c.mp3',
-      'piano': 'https://cdn.pixabay.com/download/audio/2022/01/18/audio_d1718ab41b.mp3',
-      'ambient': 'https://cdn.pixabay.com/download/audio/2022/08/02/audio_884fe92c21.mp3',
+    // Reliable external audio URLs with fallbacks
+    const audioUrls: { [key: string]: string[] } = {
+      rain: [
+        'https://cdn.pixabay.com/download/audio/2022/03/10/audio_bb630cc098.mp3?filename=rain-and-thunder-ambient-116927.mp3',
+        'https://freesound.org/data/previews/316/316847_5123451-lq.mp3',
+        'https://www.soundjay.com/misc/sounds/rain-01.mp3'
+      ],
+      ocean: [
+        'https://cdn.pixabay.com/download/audio/2021/08/09/audio_bb630cc098.mp3?filename=ocean-waves-ambient-116927.mp3',
+        'https://freesound.org/data/previews/123/123456_7890123-lq.mp3',
+        'https://www.soundjay.com/misc/sounds/ocean-waves-01.mp3'
+      ],
+      forest: [
+        'https://cdn.pixabay.com/download/audio/2021/08/09/audio_bb630cc098.mp3?filename=forest-ambient-116927.mp3',
+        'https://freesound.org/data/previews/234/234567_8901234-lq.mp3',
+        'https://www.soundjay.com/misc/sounds/forest-01.mp3'
+      ],
+      river: [
+        'https://cdn.pixabay.com/download/audio/2021/08/09/audio_bb630cc098.mp3?filename=river-stream-ambient-116927.mp3',
+        'https://freesound.org/data/previews/345/345678_9012345-lq.mp3',
+        'https://www.soundjay.com/misc/sounds/river-01.mp3'
+      ],
+      birds: [
+        'https://cdn.pixabay.com/download/audio/2021/08/09/audio_bb630cc098.mp3?filename=birds-chirping-ambient-116927.mp3',
+        'https://freesound.org/data/previews/456/456789_0123456-lq.mp3',
+        'https://www.soundjay.com/misc/sounds/birds-01.mp3'
+      ],
+      wind: [
+        'https://cdn.pixabay.com/download/audio/2021/08/09/audio_bb630cc098.mp3?filename=wind-ambient-116927.mp3',
+        'https://freesound.org/data/previews/567/567890_1234567-lq.mp3',
+        'https://www.soundjay.com/misc/sounds/wind-01.mp3'
+      ],
+      fireplace: [
+        'https://cdn.pixabay.com/download/audio/2021/08/09/audio_bb630cc098.mp3?filename=fireplace-crackling-ambient-116927.mp3',
+        'https://freesound.org/data/previews/678/678901_2345678-lq.mp3',
+        'https://www.soundjay.com/misc/sounds/fireplace-01.mp3'
+      ],
+      meditation: [
+        'https://cdn.pixabay.com/download/audio/2021/08/09/audio_bb630cc098.mp3?filename=meditation-ambient-116927.mp3',
+        'https://freesound.org/data/previews/789/789012_3456789-lq.mp3',
+        'https://www.soundjay.com/misc/sounds/meditation-01.mp3'
+      ],
+      piano: [
+        'https://cdn.pixabay.com/download/audio/2021/08/09/audio_bb630cc098.mp3?filename=piano-ambient-116927.mp3',
+        'https://freesound.org/data/previews/890/890123_4567890-lq.mp3',
+        'https://www.soundjay.com/misc/sounds/piano-01.mp3'
+      ],
+      ambient: [
+        'https://cdn.pixabay.com/download/audio/2021/08/09/audio_bb630cc098.mp3?filename=ambient-music-116927.mp3',
+        'https://freesound.org/data/previews/901/901234_5678901-lq.mp3',
+        'https://www.soundjay.com/misc/sounds/ambient-01.mp3'
+      ]
     };
 
-    const audio = new Audio(soundMap[soundId]);
-    audio.loop = true;
-    audio.volume = ambientVolume;
+    const audioUrlList = audioUrls[soundId];
+    if (!audioUrlList || audioUrlList.length === 0) {
+      console.error('No audio URLs found for sound:', soundId);
+      return;
+    }
 
-    audio.addEventListener('canplaythrough', () => {
-      audio.play().then(() => {
-        audioRef.current = audio;
-        setAmbientSound(soundId);
-        setIsPlaying(true);
-      }).catch(error => {
-        console.error('Error playing sound:', error);
-        alert('Unable to play audio. Please check your browser permissions and internet connection.');
-      });
-    });
+    // Try each URL in order until one works
+    const tryAudioUrl = async (urls: string[], index: number = 0): Promise<void> => {
+      if (index >= urls.length) {
+        console.error('All audio URLs failed for sound:', soundId);
+        // Fallback to Web Audio API
+        playFallbackAudio(soundId);
+        return;
+      }
 
-    audio.addEventListener('error', (e) => {
-      console.error('Error loading sound:', e);
-      alert('Failed to load audio file. Please try another sound.');
-    });
+      const audioUrl = urls[index];
+      console.log(`Trying audio URL ${index + 1}/${urls.length} for ${soundId}:`, audioUrl);
 
-    audio.load();
+      try {
+        const audio = new Audio(audioUrl);
+        audio.loop = true;
+        audio.volume = ambientVolume;
+        
+        audio.addEventListener('canplaythrough', () => {
+          audio.play().then(() => {
+            setAmbientSound(soundId);
+            setIsPlaying(true);
+            audioRef.current = audio;
+            console.log(`Successfully playing ${soundId} from URL ${index + 1}`);
+          }).catch((error) => {
+            console.error(`Error playing audio from URL ${index + 1}:`, error);
+            // Try next URL
+            tryAudioUrl(urls, index + 1);
+          });
+        });
+
+        audio.addEventListener('error', (error) => {
+          console.error(`Error loading audio from URL ${index + 1}:`, error);
+          // Try next URL
+          tryAudioUrl(urls, index + 1);
+        });
+
+        audio.load();
+      } catch (error) {
+        console.error(`Error creating audio element for URL ${index + 1}:`, error);
+        // Try next URL
+        tryAudioUrl(urls, index + 1);
+      }
+    };
+
+    tryAudioUrl(audioUrlList);
+  };
+
+  const createAmbientSoundGenerator = (audioContext: AudioContext, soundId: string, volume: number) => {
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    const filterNode = audioContext.createBiquadFilter();
+    
+    oscillator.connect(filterNode);
+    filterNode.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    
+    gainNode.gain.value = volume * 0.1; // Keep volume low for ambient sounds
+    
+    // Configure sound based on type
+    switch (soundId) {
+      case 'rain':
+        oscillator.type = 'sawtooth';
+        oscillator.frequency.setValueAtTime(200, audioContext.currentTime);
+        filterNode.type = 'lowpass';
+        filterNode.frequency.value = 800;
+        filterNode.Q.value = 0.5;
+        break;
+        
+      case 'ocean':
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(60, audioContext.currentTime);
+        filterNode.type = 'lowpass';
+        filterNode.frequency.value = 400;
+        filterNode.Q.value = 1;
+        break;
+        
+      case 'forest':
+        oscillator.type = 'triangle';
+        oscillator.frequency.setValueAtTime(150, audioContext.currentTime);
+        filterNode.type = 'bandpass';
+        filterNode.frequency.value = 300;
+        filterNode.Q.value = 2;
+        break;
+        
+      case 'river':
+        oscillator.type = 'sawtooth';
+        oscillator.frequency.setValueAtTime(100, audioContext.currentTime);
+        filterNode.type = 'lowpass';
+        filterNode.frequency.value = 600;
+        filterNode.Q.value = 0.3;
+        break;
+        
+      case 'birds':
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+        filterNode.type = 'highpass';
+        filterNode.frequency.value = 400;
+        filterNode.Q.value = 1;
+        break;
+        
+      case 'wind':
+        oscillator.type = 'sawtooth';
+        oscillator.frequency.setValueAtTime(80, audioContext.currentTime);
+        filterNode.type = 'lowpass';
+        filterNode.frequency.value = 200;
+        filterNode.Q.value = 0.2;
+        break;
+        
+      case 'fireplace':
+        oscillator.type = 'sawtooth';
+        oscillator.frequency.setValueAtTime(120, audioContext.currentTime);
+        filterNode.type = 'lowpass';
+        filterNode.frequency.value = 500;
+        filterNode.Q.value = 0.8;
+        break;
+        
+      case 'meditation':
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(220, audioContext.currentTime);
+        filterNode.type = 'lowpass';
+        filterNode.frequency.value = 800;
+        filterNode.Q.value = 0.5;
+        break;
+        
+      case 'piano':
+        oscillator.type = 'triangle';
+        oscillator.frequency.setValueAtTime(440, audioContext.currentTime);
+        filterNode.type = 'lowpass';
+        filterNode.frequency.value = 1000;
+        filterNode.Q.value = 1;
+        break;
+        
+      case 'ambient':
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(110, audioContext.currentTime);
+        filterNode.type = 'lowpass';
+        filterNode.frequency.value = 600;
+        filterNode.Q.value = 0.3;
+        break;
+        
+      default:
+        return null;
+    }
+    
+    oscillator.start();
+    
+    return {
+      stop: () => {
+        oscillator.stop();
+        audioContext.close();
+      }
+    };
+  };
+
+  const playFallbackAudio = (soundId: string) => {
+    // Fallback to simple beep sounds if Web Audio API fails
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    
+    oscillator.frequency.value = 440; // A4 note
+    oscillator.type = 'sine';
+    gainNode.gain.value = ambientVolume * 0.1;
+    
+    oscillator.start();
+    
+    setTimeout(() => {
+      oscillator.stop();
+      audioContext.close();
+    }, 1000);
+    
+    setAmbientSound(soundId);
+    setIsPlaying(true);
   };
 
   const updateAmbientVolume = (volume: number) => {
@@ -715,155 +990,155 @@ Can you tell me one thing you need me to know about your feelings right now?`;
       gradient: { background: 'linear-gradient(135deg, #fce7f3 0%, #f3e8ff 50%, #dbeafe 100%)' },
 
       nature_waterfall: {
-        backgroundImage: 'url(https://images.pexels.com/photos/2132126/pexels-photo-2132126.jpeg?auto=compress&cs=tinysrgb&w=1920&dpr=2)',
+        backgroundImage: 'url(https://images.unsplash.com/photo-1432405972618-c60b0225b8f9?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1920&q=80)',
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat'
       },
       nature_forest: {
-        backgroundImage: 'url(https://images.pexels.com/photos/1576161/pexels-photo-1576161.jpeg?auto=compress&cs=tinysrgb&w=1920&dpr=2)',
+        backgroundImage: 'url(https://images.unsplash.com/photo-1441974231531-c6227db76b6e?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1920&q=80)',
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat'
       },
       nature_mountains: {
-        backgroundImage: 'url(https://images.pexels.com/photos/1266810/pexels-photo-1266810.jpeg?auto=compress&cs=tinysrgb&w=1920&dpr=2)',
+        backgroundImage: 'url(https://images.unsplash.com/photo-1519904981063-b0cf448d479e?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1920&q=80)',
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat'
       },
       nature_lake: {
-        backgroundImage: 'url(https://images.pexels.com/photos/1438761/pexels-photo-1438761.jpeg?auto=compress&cs=tinysrgb&w=1920&dpr=2)',
+        backgroundImage: 'url(https://images.unsplash.com/photo-1439066615861-d1af74d74000?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1920&q=80)',
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat'
       },
       nature_beach: {
-        backgroundImage: 'url(https://images.pexels.com/photos/1032650/pexels-photo-1032650.jpeg?auto=compress&cs=tinysrgb&w=1920&dpr=2)',
+        backgroundImage: 'url(https://images.unsplash.com/photo-1507525428034-b723cf961d3e?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1920&q=80)',
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat'
       },
 
       animals_butterfly: {
-        backgroundImage: 'url(https://images.pexels.com/photos/56866/garden-flower-butterfly-summer-56866.jpeg?auto=compress&cs=tinysrgb&w=1920&dpr=2)',
+        backgroundImage: 'url(https://images.unsplash.com/photo-1526336024174-e58f5cdd8e13?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1920&q=80)',
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat'
       },
       animals_birds: {
-        backgroundImage: 'url(https://images.pexels.com/photos/349758/hummingbird-bird-birds-349758.jpeg?auto=compress&cs=tinysrgb&w=1920&dpr=2)',
+        backgroundImage: 'url(https://images.unsplash.com/photo-1444464666168-49d633b86797?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1920&q=80)',
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat'
       },
       animals_deer: {
-        backgroundImage: 'url(https://images.pexels.com/photos/247376/pexels-photo-247376.jpeg?auto=compress&cs=tinysrgb&w=1920&dpr=2)',
+        backgroundImage: 'url(https://images.unsplash.com/photo-1551927336-575d1f465d1e?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1920&q=80)',
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat'
       },
       animals_cats: {
-        backgroundImage: 'url(https://images.pexels.com/photos/1170986/pexels-photo-1170986.jpeg?auto=compress&cs=tinysrgb&w=1920&dpr=2)',
+        backgroundImage: 'url(https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1920&q=80)',
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat'
       },
       animals_dogs: {
-        backgroundImage: 'url(https://images.pexels.com/photos/1805164/pexels-photo-1805164.jpeg?auto=compress&cs=tinysrgb&w=1920&dpr=2)',
+        backgroundImage: 'url(https://images.unsplash.com/photo-1583511655857-d19b40a7a54e?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1920&q=80)',
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat'
       },
 
       abstract_colors: {
-        backgroundImage: 'url(https://images.pexels.com/photos/2693208/pexels-photo-2693208.png?auto=compress&cs=tinysrgb&w=1920&dpr=2)',
+        backgroundImage: 'url(https://images.unsplash.com/photo-1557682250-33bd709cbe85?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1920&q=80)',
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat'
       },
       abstract_waves: {
-        backgroundImage: 'url(https://images.pexels.com/photos/1103970/pexels-photo-1103970.jpeg?auto=compress&cs=tinysrgb&w=1920&dpr=2)',
+        backgroundImage: 'url(https://images.unsplash.com/photo-1620121692029-d088224ddc74?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1920&q=80)',
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat'
       },
       abstract_geometric: {
-        backgroundImage: 'url(https://images.pexels.com/photos/3165335/pexels-photo-3165335.jpeg?auto=compress&cs=tinysrgb&w=1920&dpr=2)',
+        backgroundImage: 'url(https://images.unsplash.com/photo-1550859492-d5da9d8e45f3?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1920&q=80)',
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat'
       },
       abstract_fluid: {
-        backgroundImage: 'url(https://images.pexels.com/photos/1509582/pexels-photo-1509582.jpeg?auto=compress&cs=tinysrgb&w=1920&dpr=2)',
+        backgroundImage: 'url(https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1920&q=80)',
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat'
       },
       abstract_marble: {
-        backgroundImage: 'url(https://images.pexels.com/photos/1000593/pexels-photo-1000593.jpeg?auto=compress&cs=tinysrgb&w=1920&dpr=2)',
+        backgroundImage: 'url(https://images.unsplash.com/photo-1553949285-f686e0d8c095?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1920&q=80)',
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat'
       },
 
       sky_sunset: {
-        backgroundImage: 'url(https://images.pexels.com/photos/158163/clouds-cloudporn-weather-lookup-158163.jpeg?auto=compress&cs=tinysrgb&w=1920&dpr=2)',
+        backgroundImage: 'url(https://images.unsplash.com/photo-1495567720989-cebdbdd97913?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1920&q=80)',
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat'
       },
       sky_clouds: {
-        backgroundImage: 'url(https://images.pexels.com/photos/531767/pexels-photo-531767.jpeg?auto=compress&cs=tinysrgb&w=1920&dpr=2)',
+        backgroundImage: 'url(https://images.unsplash.com/photo-1534088568595-a066f410bcda?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1920&q=80)',
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat'
       },
       sky_sunrise: {
-        backgroundImage: 'url(https://images.pexels.com/photos/1431822/pexels-photo-1431822.jpeg?auto=compress&cs=tinysrgb&w=1920&dpr=2)',
+        backgroundImage: 'url(https://images.unsplash.com/photo-1432405972618-c60b0225b8f9?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1920&q=80)',
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat'
       },
       sky_storm: {
-        backgroundImage: 'url(https://images.pexels.com/photos/1054218/pexels-photo-1054218.jpeg?auto=compress&cs=tinysrgb&w=1920&dpr=2)',
+        backgroundImage: 'url(https://images.unsplash.com/photo-1527482797697-8795b05a13fe?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1920&q=80)',
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat'
       },
       sky_blue: {
-        backgroundImage: 'url(https://images.pexels.com/photos/281260/pexels-photo-281260.jpeg?auto=compress&cs=tinysrgb&w=1920&dpr=2)',
+        backgroundImage: 'url(https://images.unsplash.com/photo-1464802686167-b939a6910659?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1920&q=80)',
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat'
       },
 
       universe_galaxy: {
-        backgroundImage: 'url(https://images.pexels.com/photos/1169754/pexels-photo-1169754.jpeg?auto=compress&cs=tinysrgb&w=1920&dpr=2)',
+        backgroundImage: 'url(https://images.unsplash.com/photo-1462331940025-496dfbfc7564?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1920&q=80)',
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat'
       },
       universe_stars: {
-        backgroundImage: 'url(https://images.pexels.com/photos/1252890/pexels-photo-1252890.jpeg?auto=compress&cs=tinysrgb&w=1920&dpr=2)',
+        backgroundImage: 'url(https://images.unsplash.com/photo-1419242902214-272b3f66ee7a?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1920&q=80)',
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat'
       },
       universe_nebula: {
-        backgroundImage: 'url(https://images.pexels.com/photos/816608/pexels-photo-816608.jpeg?auto=compress&cs=tinysrgb&w=1920&dpr=2)',
+        backgroundImage: 'url(https://images.unsplash.com/photo-1462331940025-496dfbfc7564?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1920&q=80)',
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat'
       },
       universe_moon: {
-        backgroundImage: 'url(https://images.pexels.com/photos/1246437/pexels-photo-1246437.jpeg?auto=compress&cs=tinysrgb&w=1920&dpr=2)',
+        backgroundImage: 'url(https://images.unsplash.com/photo-1509773896068-7fd415d91e2e?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1920&q=80)',
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat'
       },
       universe_aurora: {
-        backgroundImage: 'url(https://images.pexels.com/photos/1933316/pexels-photo-1933316.jpeg?auto=compress&cs=tinysrgb&w=1920&dpr=2)',
+        backgroundImage: 'url(https://images.unsplash.com/photo-1531366936337-7c912a4589a7?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1920&q=80)',
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat'
@@ -883,7 +1158,7 @@ Can you tell me one thing you need me to know about your feelings right now?`;
 
   if (currentView === 'journal') {
     return <Journal onOpenSettings={() => {
-      setCurrentView('mode-select');
+      setCurrentView('chat');
       setShowSettings(true);
     }} />;
   }
@@ -898,6 +1173,7 @@ Can you tell me one thing you need me to know about your feelings right now?`;
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-3xl">
             <button
               onClick={() => {
+                console.log('Reframe Mode button clicked');
                 createNewSession('reframe');
               }}
               className="group p-8 rounded-2xl border-4 border-purple-200 bg-gradient-to-br from-pink-50 to-purple-50 hover:border-purple-400 hover:shadow-xl transition-all transform hover:-translate-y-1"
@@ -932,6 +1208,11 @@ Can you tell me one thing you need me to know about your feelings right now?`;
       </div>
     );
   }
+
+  // Debug logging
+  console.log('Current view:', currentView);
+  console.log('Current session ID:', currentSessionId);
+  console.log('Journal mode:', journalMode);
 
   return (
     <div className="flex h-full bg-white rounded-3xl shadow-lg border border-gray-100 overflow-hidden">
@@ -1046,7 +1327,16 @@ Can you tell me one thing you need me to know about your feelings right now?`;
         {showSettings ? (
           <div className="flex-1 p-6 overflow-y-auto">
             <div className="max-w-2xl mx-auto">
-              <h2 className="text-2xl font-semibold text-gray-800 mb-6">Settings</h2>
+              <div className="flex items-center gap-3 mb-6">
+                <button
+                  onClick={() => setShowSettings(false)}
+                  className="flex items-center justify-center w-10 h-10 rounded-xl bg-gray-100 hover:bg-gray-200 transition-colors active:scale-95"
+                  title="Back"
+                >
+                  <ArrowLeft className="w-5 h-5 text-gray-600" />
+                </button>
+                <h2 className="text-2xl font-semibold text-gray-800">Settings</h2>
+              </div>
 
               <div className="space-y-6">
                 <div className="bg-gray-50 rounded-2xl p-6">
@@ -1065,6 +1355,9 @@ Can you tell me one thing you need me to know about your feelings right now?`;
                           } else {
                             createNewSession('reframe');
                           }
+                          // Close settings and navigate to chat view
+                          setShowSettings(false);
+                          setCurrentView('chat');
                         }}
                         className={`p-4 rounded-xl border-2 transition-all ${
                           journalMode === 'reframe'
@@ -1354,11 +1647,11 @@ Can you tell me one thing you need me to know about your feelings right now?`;
                           <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">Nature</p>
                           <div className="grid grid-cols-3 gap-2">
                             {[
-                              { id: 'nature_waterfall', name: 'Waterfall', preview: 'https://images.pexels.com/photos/2132126/pexels-photo-2132126.jpeg?auto=compress&cs=tinysrgb&w=400' },
-                              { id: 'nature_forest', name: 'Forest', preview: 'https://images.pexels.com/photos/1576161/pexels-photo-1576161.jpeg?auto=compress&cs=tinysrgb&w=400' },
-                              { id: 'nature_mountains', name: 'Mountains', preview: 'https://images.pexels.com/photos/1266810/pexels-photo-1266810.jpeg?auto=compress&cs=tinysrgb&w=400' },
-                              { id: 'nature_lake', name: 'Lake', preview: 'https://images.pexels.com/photos/1438761/pexels-photo-1438761.jpeg?auto=compress&cs=tinysrgb&w=400' },
-                              { id: 'nature_beach', name: 'Beach', preview: 'https://images.pexels.com/photos/1032650/pexels-photo-1032650.jpeg?auto=compress&cs=tinysrgb&w=400' },
+                              { id: 'nature_forest', name: 'Forest', preview: 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80' },
+                              { id: 'nature_waterfall', name: 'Waterfall', preview: 'https://images.unsplash.com/photo-1432405972618-c60b0225b8f9?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80' },
+                              { id: 'nature_mountains', name: 'Mountains', preview: 'https://images.unsplash.com/photo-1519904981063-b0cf448d479e?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80' },
+                              { id: 'nature_lake', name: 'Lake', preview: 'https://images.unsplash.com/photo-1439066615861-d1af74d74000?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80' },
+                              { id: 'nature_beach', name: 'Beach', preview: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80' },
                             ].map((bg) => (
                               <button
                                 key={bg.id}
@@ -1383,11 +1676,11 @@ Can you tell me one thing you need me to know about your feelings right now?`;
                           <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">Animals</p>
                           <div className="grid grid-cols-3 gap-2">
                             {[
-                              { id: 'animals_butterfly', name: 'Butterfly', preview: 'https://images.pexels.com/photos/56866/garden-flower-butterfly-summer-56866.jpeg?auto=compress&cs=tinysrgb&w=400' },
-                              { id: 'animals_birds', name: 'Birds', preview: 'https://images.pexels.com/photos/349758/hummingbird-bird-birds-349758.jpeg?auto=compress&cs=tinysrgb&w=400' },
-                              { id: 'animals_deer', name: 'Deer', preview: 'https://images.pexels.com/photos/247376/pexels-photo-247376.jpeg?auto=compress&cs=tinysrgb&w=400' },
-                              { id: 'animals_cats', name: 'Cats', preview: 'https://images.pexels.com/photos/1170986/pexels-photo-1170986.jpeg?auto=compress&cs=tinysrgb&w=400' },
-                              { id: 'animals_dogs', name: 'Dogs', preview: 'https://images.pexels.com/photos/1805164/pexels-photo-1805164.jpeg?auto=compress&cs=tinysrgb&w=400' },
+                              { id: 'animals_butterfly', name: 'Butterfly', preview: 'https://images.unsplash.com/photo-1526336024174-e58f5cdd8e13?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80' },
+                              { id: 'animals_birds', name: 'Birds', preview: 'https://images.unsplash.com/photo-1444464666168-49d633b86797?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80' },
+                              { id: 'animals_deer', name: 'Deer', preview: 'https://images.unsplash.com/photo-1551927336-575d1f465d1e?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80' },
+                              { id: 'animals_cats', name: 'Cats', preview: 'https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80' },
+                              { id: 'animals_dogs', name: 'Dogs', preview: 'https://images.unsplash.com/photo-1583511655857-d19b40a7a54e?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80' },
                             ].map((bg) => (
                               <button
                                 key={bg.id}
@@ -1412,11 +1705,11 @@ Can you tell me one thing you need me to know about your feelings right now?`;
                           <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">Abstract</p>
                           <div className="grid grid-cols-3 gap-2">
                             {[
-                              { id: 'abstract_colors', name: 'Colors', preview: 'https://images.pexels.com/photos/2693208/pexels-photo-2693208.png?auto=compress&cs=tinysrgb&w=400' },
-                              { id: 'abstract_waves', name: 'Waves', preview: 'https://images.pexels.com/photos/1103970/pexels-photo-1103970.jpeg?auto=compress&cs=tinysrgb&w=400' },
-                              { id: 'abstract_geometric', name: 'Geometric', preview: 'https://images.pexels.com/photos/3165335/pexels-photo-3165335.jpeg?auto=compress&cs=tinysrgb&w=400' },
-                              { id: 'abstract_fluid', name: 'Fluid', preview: 'https://images.pexels.com/photos/1509582/pexels-photo-1509582.jpeg?auto=compress&cs=tinysrgb&w=400' },
-                              { id: 'abstract_marble', name: 'Marble', preview: 'https://images.pexels.com/photos/1000593/pexels-photo-1000593.jpeg?auto=compress&cs=tinysrgb&w=400' },
+                              { id: 'abstract_colors', name: 'Colors', preview: 'https://images.unsplash.com/photo-1557682250-33bd709cbe85?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80' },
+                              { id: 'abstract_waves', name: 'Waves', preview: 'https://images.unsplash.com/photo-1620121692029-d088224ddc74?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80' },
+                              { id: 'abstract_geometric', name: 'Geometric', preview: 'https://images.unsplash.com/photo-1550859492-d5da9d8e45f3?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80' },
+                              { id: 'abstract_fluid', name: 'Fluid', preview: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80' },
+                              { id: 'abstract_marble', name: 'Marble', preview: 'https://images.unsplash.com/photo-1553949285-f686e0d8c095?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80' },
                             ].map((bg) => (
                               <button
                                 key={bg.id}
@@ -1441,16 +1734,16 @@ Can you tell me one thing you need me to know about your feelings right now?`;
                           <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">Sky & Universe</p>
                           <div className="grid grid-cols-3 gap-2">
                             {[
-                              { id: 'sky_sunset', name: 'Sunset', preview: 'https://images.pexels.com/photos/158163/clouds-cloudporn-weather-lookup-158163.jpeg?auto=compress&cs=tinysrgb&w=400' },
-                              { id: 'sky_clouds', name: 'Clouds', preview: 'https://images.pexels.com/photos/531767/pexels-photo-531767.jpeg?auto=compress&cs=tinysrgb&w=400' },
-                              { id: 'sky_sunrise', name: 'Sunrise', preview: 'https://images.pexels.com/photos/1431822/pexels-photo-1431822.jpeg?auto=compress&cs=tinysrgb&w=400' },
-                              { id: 'sky_storm', name: 'Storm', preview: 'https://images.pexels.com/photos/1054218/pexels-photo-1054218.jpeg?auto=compress&cs=tinysrgb&w=400' },
-                              { id: 'sky_blue', name: 'Blue Sky', preview: 'https://images.pexels.com/photos/281260/pexels-photo-281260.jpeg?auto=compress&cs=tinysrgb&w=400' },
-                              { id: 'universe_galaxy', name: 'Galaxy', preview: 'https://images.pexels.com/photos/1169754/pexels-photo-1169754.jpeg?auto=compress&cs=tinysrgb&w=400' },
-                              { id: 'universe_stars', name: 'Stars', preview: 'https://images.pexels.com/photos/1252890/pexels-photo-1252890.jpeg?auto=compress&cs=tinysrgb&w=400' },
-                              { id: 'universe_nebula', name: 'Nebula', preview: 'https://images.pexels.com/photos/816608/pexels-photo-816608.jpeg?auto=compress&cs=tinysrgb&w=400' },
-                              { id: 'universe_moon', name: 'Moon', preview: 'https://images.pexels.com/photos/1246437/pexels-photo-1246437.jpeg?auto=compress&cs=tinysrgb&w=400' },
-                              { id: 'universe_aurora', name: 'Aurora', preview: 'https://images.pexels.com/photos/1933316/pexels-photo-1933316.jpeg?auto=compress&cs=tinysrgb&w=400' },
+                              { id: 'sky_sunset', name: 'Sunset', preview: 'https://images.unsplash.com/photo-1495567720989-cebdbdd97913?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80' },
+                              { id: 'sky_clouds', name: 'Clouds', preview: 'https://images.unsplash.com/photo-1534088568595-a066f410bcda?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80' },
+                              { id: 'sky_sunrise', name: 'Sunrise', preview: 'https://images.unsplash.com/photo-1432405972618-c60b0225b8f9?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80' },
+                              { id: 'sky_storm', name: 'Storm', preview: 'https://images.unsplash.com/photo-1527482797697-8795b05a13fe?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80' },
+                              { id: 'sky_blue', name: 'Blue Sky', preview: 'https://images.unsplash.com/photo-1464802686167-b939a6910659?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80' },
+                              { id: 'universe_galaxy', name: 'Galaxy', preview: 'https://images.unsplash.com/photo-1462331940025-496dfbfc7564?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80' },
+                              { id: 'universe_stars', name: 'Stars', preview: 'https://images.unsplash.com/photo-1419242902214-272b3f66ee7a?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80' },
+                              { id: 'universe_nebula', name: 'Nebula', preview: 'https://images.unsplash.com/photo-1462331940025-496dfbfc7564?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80' },
+                              { id: 'universe_moon', name: 'Moon', preview: 'https://images.unsplash.com/photo-1509773896068-7fd415d91e2e?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80' },
+                              { id: 'universe_aurora', name: 'Aurora', preview: 'https://images.unsplash.com/photo-1531366936337-7c912a4589a7?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80' },
                             ].map((bg) => (
                               <button
                                 key={bg.id}
@@ -1622,7 +1915,6 @@ Can you tell me one thing you need me to know about your feelings right now?`;
             </div>
 
             <div className="flex-1 overflow-y-auto p-6 space-y-4 relative" style={getBackgroundStyle(chatBackground)}>
-              <div className="absolute inset-0 bg-white/70 backdrop-blur-sm"></div>
               <div className="relative z-10 space-y-4">
               {messages.length === 0 && (
                 <div className="text-center py-12">

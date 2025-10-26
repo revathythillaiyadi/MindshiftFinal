@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { BookOpen, Mic, MicOff, Trash2, Edit3, X, Settings, Save, Menu, Plus, ChevronLeft } from 'lucide-react';
 import { supabase, JournalEntry } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { webhookService } from '../lib/webhook';
 
 interface JournalProps {
   onOpenSettings?: () => void;
@@ -167,21 +168,44 @@ export function Journal({ onOpenSettings }: JournalProps = {}) {
     });
 
     try {
-      const { data, error } = await supabase
-        .from('journal_entries')
-        .insert({
+      if (supabase) {
+        const { data, error } = await supabase
+          .from('journal_entries')
+          .insert({
+            user_id: user.id,
+            title: entryTitle,
+            raw_text_content: rawTextContent.trim(),
+            content: rawTextContent.trim(),
+            entry_date: new Date().toISOString().split('T')[0],
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        setEntries(prev => [data, ...prev]);
+      } else {
+        // Demo mode - create a local entry
+        const demoEntry: JournalEntry = {
+          id: crypto.randomUUID(),
           user_id: user.id,
           title: entryTitle,
           raw_text_content: rawTextContent.trim(),
           content: rawTextContent.trim(),
           entry_date: new Date().toISOString().split('T')[0],
-        })
-        .select()
-        .single();
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+        setEntries(prev => [demoEntry, ...prev]);
+      }
 
-      if (error) throw error;
+      // Send journal entry to n8n webhook
+      webhookService.sendJournalEvent({
+        title: entryTitle,
+        content: rawTextContent.trim(),
+        entryDate: new Date().toISOString().split('T')[0],
+      }, user.id);
 
-      setEntries(prev => [data, ...prev]);
       setTitle('');
       setRawTextContent('');
       setViewMode('list');
@@ -197,13 +221,15 @@ export function Journal({ onOpenSettings }: JournalProps = {}) {
     if (!user) return;
 
     try {
-      const { error } = await supabase
-        .from('journal_entries')
-        .delete()
-        .eq('id', entryId)
-        .eq('user_id', user.id);
+      if (supabase) {
+        const { error } = await supabase
+          .from('journal_entries')
+          .delete()
+          .eq('id', entryId)
+          .eq('user_id', user.id);
 
-      if (error) throw error;
+        if (error) throw error;
+      }
 
       setEntries(prev => prev.filter(e => e.id !== entryId));
       setShowDeleteConfirm(false);

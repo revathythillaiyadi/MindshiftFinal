@@ -19,6 +19,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // If Supabase is not configured, create a demo user
+    if (!supabase) {
+      const demoUser = {
+        id: 'demo-user-id',
+        email: 'demo@mindshift.app',
+        user_metadata: { display_name: 'Demo User' },
+        app_metadata: {},
+        aud: 'authenticated',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        email_confirmed_at: new Date().toISOString(),
+        last_sign_in_at: new Date().toISOString(),
+        role: 'authenticated',
+        identities: []
+      } as User;
+      
+      const demoProfile = {
+        id: 'demo-user-id',
+        email: 'demo@mindshift.app',
+        display_name: 'Demo User',
+        current_streak: 0,
+        longest_streak: 0,
+        last_activity_date: null,
+        voice_preference: null,
+        voice_enabled: false,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      } as Profile;
+      
+      setUser(demoUser);
+      setProfile(demoProfile);
+      setLoading(false);
+      return;
+    }
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
       if (session?.user) {
@@ -44,6 +79,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const loadProfile = async (userId: string) => {
+    if (!supabase) {
+      setLoading(false);
+      return;
+    }
+
     const { data } = await supabase
       .from('profiles')
       .select('*')
@@ -75,6 +115,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signUp = async (email: string, password: string, displayName: string) => {
+    if (!supabase) {
+      // Demo mode - simulate successful signup
+      const demoUser = {
+        id: 'demo-user-id',
+        email: email,
+        user_metadata: { display_name: displayName },
+        app_metadata: {},
+        aud: 'authenticated',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        email_confirmed_at: new Date().toISOString(),
+        last_sign_in_at: new Date().toISOString(),
+        role: 'authenticated',
+        identities: []
+      } as User;
+      
+      const demoProfile = {
+        id: 'demo-user-id',
+        email: email,
+        display_name: displayName,
+        current_streak: 0,
+        longest_streak: 0,
+        last_activity_date: null,
+        voice_preference: null,
+        voice_enabled: false,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      } as Profile;
+      
+      setUser(demoUser);
+      setProfile(demoProfile);
+      return;
+    }
+
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -98,6 +172,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signIn = async (email: string, password: string) => {
+    if (!supabase) {
+      // Demo mode - simulate successful signin
+      const demoUser = {
+        id: 'demo-user-id',
+        email: email,
+        user_metadata: { display_name: 'Demo User' },
+        app_metadata: {},
+        aud: 'authenticated',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        email_confirmed_at: new Date().toISOString(),
+        last_sign_in_at: new Date().toISOString(),
+        role: 'authenticated',
+        identities: []
+      } as User;
+      
+      const demoProfile = {
+        id: 'demo-user-id',
+        email: email,
+        display_name: 'Demo User',
+        current_streak: 0,
+        longest_streak: 0,
+        last_activity_date: null,
+        voice_preference: null,
+        voice_enabled: false,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      } as Profile;
+      
+      setUser(demoUser);
+      setProfile(demoProfile);
+      return;
+    }
+
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -112,6 +220,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
+    if (!supabase) {
+      // Demo mode - clear user data
+      setUser(null);
+      setProfile(null);
+      return;
+    }
+    
     await supabase.auth.signOut();
   };
 

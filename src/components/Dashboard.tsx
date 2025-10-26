@@ -4,6 +4,7 @@ import { ChatBot } from './ChatBot';
 import { ProgressTracker } from './ProgressTracker';
 import { StreaksAndAchievements } from './StreaksAndAchievements';
 import { MoodTracker } from './MoodTracker';
+import { WebhookTest } from './WebhookTest';
 
 export function Dashboard() {
   const { profile, signOut } = useAuth();
@@ -54,6 +55,8 @@ export function Dashboard() {
             <ProgressTracker />
             <MoodTracker />
           </div>
+
+          <WebhookTest />
         </div>
       </div>
     </div>

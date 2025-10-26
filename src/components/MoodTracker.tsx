@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Smile, Frown, Meh, SmilePlus, Heart } from 'lucide-react';
 import { supabase, MoodLog } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { webhookService } from '../lib/webhook';
 
 const moods = [
   { value: 1, label: 'Very Low', icon: Frown, color: '#FF6B6B' },
@@ -25,7 +26,7 @@ export function MoodTracker() {
   }, [user]);
 
   const loadRecentMoods = async () => {
-    if (!user) return;
+    if (!user || !supabase) return;
 
     const { data } = await supabase
       .from('mood_logs')
@@ -45,12 +46,21 @@ export function MoodTracker() {
     const mood = moods.find((m) => m.value === selectedMood);
     if (!mood) return;
 
-    await supabase.from('mood_logs').insert({
-      user_id: user.id,
-      mood_value: selectedMood,
-      mood_label: mood.label,
-      notes: notes.trim() || null,
-    });
+    if (supabase) {
+      await supabase.from('mood_logs').insert({
+        user_id: user.id,
+        mood_value: selectedMood,
+        mood_label: mood.label,
+        notes: notes.trim() || null,
+      });
+    }
+
+    // Send mood data to n8n webhook
+    webhookService.sendMoodEvent({
+      moodValue: selectedMood,
+      moodLabel: mood.label,
+      notes: notes.trim() || undefined,
+    }, user.id);
 
     setSelectedMood(null);
     setNotes('');

@@ -3,7 +3,15 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Check if we have valid Supabase credentials
+const hasValidCredentials = supabaseUrl && 
+  supabaseUrl !== 'https://your-project-id.supabase.co' && 
+  supabaseAnonKey && 
+  supabaseAnonKey !== 'your_supabase_anon_key_here';
+
+export const supabase = hasValidCredentials 
+  ? createClient(supabaseUrl, supabaseAnonKey)
+  : null;
 
 export type Profile = {
   id: string;

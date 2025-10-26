@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Flame, Trophy, Target, Plus, CheckCircle2, Circle } from 'lucide-react';
 import { supabase, Achievement, Goal } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { webhookService } from '../lib/webhook';
 
 export function StreaksAndAchievements() {
   const [achievements, setAchievements] = useState<Achievement[]>([]);
@@ -18,7 +19,7 @@ export function StreaksAndAchievements() {
   }, [user]);
 
   const loadAchievements = async () => {
-    if (!user) return;
+    if (!user || !supabase) return;
 
     const { data } = await supabase
       .from('achievements')
@@ -33,7 +34,7 @@ export function StreaksAndAchievements() {
   };
 
   const loadGoals = async () => {
-    if (!user) return;
+    if (!user || !supabase) return;
 
     const { data } = await supabase
       .from('goals')
@@ -51,10 +52,19 @@ export function StreaksAndAchievements() {
   const addGoal = async () => {
     if (!user || !newGoalTitle.trim()) return;
 
-    await supabase.from('goals').insert({
-      user_id: user.id,
+    if (supabase) {
+      await supabase.from('goals').insert({
+        user_id: user.id,
+        title: newGoalTitle.trim(),
+      });
+    }
+
+    // Send goal creation to n8n webhook
+    webhookService.sendGoalEvent({
       title: newGoalTitle.trim(),
-    });
+      completed: false,
+      action: 'created',
+    }, user.id);
 
     setNewGoalTitle('');
     setShowAddGoal(false);
@@ -62,14 +72,23 @@ export function StreaksAndAchievements() {
   };
 
   const toggleGoal = async (goal: Goal) => {
-    await supabase
-      .from('goals')
-      .update({
-        completed: !goal.completed,
-        completed_at: !goal.completed ? new Date().toISOString() : null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', goal.id);
+    if (supabase) {
+      await supabase
+        .from('goals')
+        .update({
+          completed: !goal.completed,
+          completed_at: !goal.completed ? new Date().toISOString() : null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', goal.id);
+    }
+
+    // Send goal completion to n8n webhook
+    webhookService.sendGoalEvent({
+      title: goal.title,
+      completed: !goal.completed,
+      action: !goal.completed ? 'completed' : 'uncompleted',
+    }, user.id);
 
     loadGoals();
   };
