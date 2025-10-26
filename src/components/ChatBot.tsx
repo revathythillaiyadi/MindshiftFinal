@@ -316,51 +316,9 @@ export function ChatBot() {
     }
   };
 
-  const makeChildlike = (text: string): string => {
-    let childText = text;
-
-    const fillerPhrases = ['um', 'like', 'you know', 'and', 'and then'];
-    const excitedWords = ['super', 'really really', 'so so'];
-    const sentences = childText.split(/(?<=[.!?])\s+/);
-
-    childText = sentences.map((sentence, index) => {
-      if (sentence.length > 30) {
-        const words = sentence.split(' ');
-        const insertPoints = [Math.floor(words.length * 0.3), Math.floor(words.length * 0.6)];
-
-        insertPoints.forEach((point, i) => {
-          if (point < words.length) {
-            words.splice(point + i, 0, fillerPhrases[Math.floor(Math.random() * fillerPhrases.length)] + ',');
-          }
-        });
-
-        return words.join(' ');
-      }
-      return sentence;
-    }).join(' ');
-
-    childText = childText.replace(/\bvery\b/gi, 'really really');
-    childText = childText.replace(/\bimportant\b/gi, 'super duper important');
-    childText = childText.replace(/\bgood\b/gi, 'really good');
-    childText = childText.replace(/\bhappy\b/gi, 'so happy');
-
-    const starters = ['So', 'Well', 'Um', 'You know what'];
-    if (Math.random() > 0.4) {
-      childText = starters[Math.floor(Math.random() * starters.length)] + ', ' + childText;
-    }
-
-    if (Math.random() > 0.6) {
-      childText = childText + '!';
-    }
-
-    return childText;
-  };
-
   const speakText = (text: string) => {
     window.speechSynthesis.cancel();
-
-    let spokenText = text;
-    const utterance = new SpeechSynthesisUtterance();
+    const utterance = new SpeechSynthesisUtterance(text);
 
     if (selectedVoice) {
       const voice = availableVoices.find(v => v.name === selectedVoice);
@@ -370,10 +328,6 @@ export function ChatBot() {
         if (voice.name.toLowerCase().includes('male') || voice.name.toLowerCase().includes('james')) {
           utterance.rate = 0.9;
           utterance.pitch = 0.95;
-        } else if (voice.name.toLowerCase().includes('child') || voice.name.toLowerCase().includes('junior') || voice.name.toLowerCase().includes('alex')) {
-          spokenText = makeChildlike(text);
-          utterance.rate = 1.2;
-          utterance.pitch = 1.8;
         } else {
           utterance.rate = 0.85;
           utterance.pitch = 1.05;
@@ -384,7 +338,6 @@ export function ChatBot() {
       utterance.pitch = 1.05;
     }
 
-    utterance.text = spokenText;
     utterance.volume = 1;
 
     utterance.onstart = () => setIsSpeaking(true);
