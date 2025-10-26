@@ -319,7 +319,8 @@ export function ChatBot() {
   const makeChildlike = (text: string): string => {
     let childText = text;
 
-    const fillerPhrases = ['um', 'uh', 'like', 'you know', 'so'];
+    const fillerPhrases = ['um', 'like', 'you know', 'and', 'and then'];
+    const excitedWords = ['super', 'really really', 'so so'];
     const sentences = childText.split(/(?<=[.!?])\s+/);
 
     childText = sentences.map((sentence, index) => {
@@ -339,10 +340,17 @@ export function ChatBot() {
     }).join(' ');
 
     childText = childText.replace(/\bvery\b/gi, 'really really');
-    childText = childText.replace(/\bimportant\b/gi, 'super important');
+    childText = childText.replace(/\bimportant\b/gi, 'super duper important');
+    childText = childText.replace(/\bgood\b/gi, 'really good');
+    childText = childText.replace(/\bhappy\b/gi, 'so happy');
 
-    if (Math.random() > 0.5) {
-      childText = 'So, ' + childText;
+    const starters = ['So', 'Well', 'Um', 'You know what'];
+    if (Math.random() > 0.4) {
+      childText = starters[Math.floor(Math.random() * starters.length)] + ', ' + childText;
+    }
+
+    if (Math.random() > 0.6) {
+      childText = childText + '!';
     }
 
     return childText;
@@ -364,8 +372,8 @@ export function ChatBot() {
           utterance.pitch = 0.95;
         } else if (voice.name.toLowerCase().includes('child') || voice.name.toLowerCase().includes('junior') || voice.name.toLowerCase().includes('alex')) {
           spokenText = makeChildlike(text);
-          utterance.rate = 1.15;
-          utterance.pitch = 1.6;
+          utterance.rate = 1.2;
+          utterance.pitch = 1.8;
         } else {
           utterance.rate = 0.85;
           utterance.pitch = 1.05;
