@@ -316,9 +316,42 @@ export function ChatBot() {
     }
   };
 
+  const makeChildlike = (text: string): string => {
+    const childlikeReplacements: { [key: string]: string } = {
+      'difficult': 'hard',
+      'challenging': 'tough',
+      'understand': 'get it',
+      'wonderful': 'super cool',
+      'excellent': 'awesome',
+      'however': 'but',
+      'therefore': 'so',
+      'perhaps': 'maybe',
+      'certainly': 'for sure',
+      'absolutely': 'totally',
+      'remember': 'member',
+      'because': 'cause',
+      'going to': 'gonna',
+      'want to': 'wanna',
+    };
+
+    let childText = text;
+    Object.entries(childlikeReplacements).forEach(([formal, casual]) => {
+      const regex = new RegExp(`\\b${formal}\\b`, 'gi');
+      childText = childText.replace(regex, casual);
+    });
+
+    childText = childText.replace(/\./g, '! ');
+    childText = childText.replace(/very /gi, 'super ');
+    childText = childText.replace(/really /gi, 'super duper ');
+
+    return childText;
+  };
+
   const speakText = (text: string) => {
     window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
+
+    let spokenText = text;
+    const utterance = new SpeechSynthesisUtterance();
 
     if (selectedVoice) {
       const voice = availableVoices.find(v => v.name === selectedVoice);
@@ -329,8 +362,9 @@ export function ChatBot() {
           utterance.rate = 0.9;
           utterance.pitch = 0.95;
         } else if (voice.name.toLowerCase().includes('child') || voice.name.toLowerCase().includes('junior') || voice.name.toLowerCase().includes('alex')) {
-          utterance.rate = 0.95;
-          utterance.pitch = 1.3;
+          spokenText = makeChildlike(text);
+          utterance.rate = 1.1;
+          utterance.pitch = 1.5;
         } else {
           utterance.rate = 0.85;
           utterance.pitch = 1.05;
@@ -341,6 +375,7 @@ export function ChatBot() {
       utterance.pitch = 1.05;
     }
 
+    utterance.text = spokenText;
     utterance.volume = 1;
 
     utterance.onstart = () => setIsSpeaking(true);
