@@ -44,6 +44,7 @@ export function ChatBot() {
   const [chatBackground, setChatBackground] = useState('gradient');
   const [emojiEnabled, setEmojiEnabled] = useState(true);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [customBackgrounds, setCustomBackgrounds] = useState<string[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
   const { user, profile } = useAuth();
@@ -412,69 +413,199 @@ export function ChatBot() {
     setShowEmojiPicker(false);
   };
 
+  const handleCustomImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !user) return;
+
+    if (!file.type.startsWith('image/')) {
+      alert('Please upload an image file');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Image must be smaller than 5MB');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      const base64String = reader.result as string;
+      const newCustomBg = `custom_${base64String}`;
+
+      setCustomBackgrounds(prev => [...prev, base64String]);
+      await updateChatBackground(newCustomBg);
+    };
+    reader.readAsDataURL(file);
+  };
+
   const getBackgroundStyle = (bg: string): React.CSSProperties => {
+    if (bg.startsWith('custom_')) {
+      return {
+        backgroundImage: `url(${bg.replace('custom_', '')})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat'
+      };
+    }
+
     const backgrounds: { [key: string]: React.CSSProperties } = {
       gradient: { background: 'linear-gradient(135deg, #fce7f3 0%, #f3e8ff 50%, #dbeafe 100%)' },
+
       nature_waterfall: {
-        backgroundImage: 'url(https://images.pexels.com/photos/1437468/pexels-photo-1437468.jpeg?auto=compress&cs=tinysrgb&w=1920)',
+        backgroundImage: 'url(https://images.pexels.com/photos/2132126/pexels-photo-2132126.jpeg?auto=compress&cs=tinysrgb&w=1920&dpr=2)',
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat'
       },
       nature_forest: {
-        backgroundImage: 'url(https://images.pexels.com/photos/1179229/pexels-photo-1179229.jpeg?auto=compress&cs=tinysrgb&w=1920)',
+        backgroundImage: 'url(https://images.pexels.com/photos/1576161/pexels-photo-1576161.jpeg?auto=compress&cs=tinysrgb&w=1920&dpr=2)',
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat'
       },
+      nature_mountains: {
+        backgroundImage: 'url(https://images.pexels.com/photos/1266810/pexels-photo-1266810.jpeg?auto=compress&cs=tinysrgb&w=1920&dpr=2)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat'
+      },
+      nature_lake: {
+        backgroundImage: 'url(https://images.pexels.com/photos/1438761/pexels-photo-1438761.jpeg?auto=compress&cs=tinysrgb&w=1920&dpr=2)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat'
+      },
+      nature_beach: {
+        backgroundImage: 'url(https://images.pexels.com/photos/1032650/pexels-photo-1032650.jpeg?auto=compress&cs=tinysrgb&w=1920&dpr=2)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat'
+      },
+
       animals_butterfly: {
-        backgroundImage: 'url(https://images.pexels.com/photos/1496373/pexels-photo-1496373.jpeg?auto=compress&cs=tinysrgb&w=1920)',
+        backgroundImage: 'url(https://images.pexels.com/photos/56866/garden-flower-butterfly-summer-56866.jpeg?auto=compress&cs=tinysrgb&w=1920&dpr=2)',
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat'
       },
       animals_birds: {
-        backgroundImage: 'url(https://images.pexels.com/photos/1661179/pexels-photo-1661179.jpeg?auto=compress&cs=tinysrgb&w=1920)',
+        backgroundImage: 'url(https://images.pexels.com/photos/349758/hummingbird-bird-birds-349758.jpeg?auto=compress&cs=tinysrgb&w=1920&dpr=2)',
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat'
       },
+      animals_deer: {
+        backgroundImage: 'url(https://images.pexels.com/photos/247376/pexels-photo-247376.jpeg?auto=compress&cs=tinysrgb&w=1920&dpr=2)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat'
+      },
+      animals_cats: {
+        backgroundImage: 'url(https://images.pexels.com/photos/1170986/pexels-photo-1170986.jpeg?auto=compress&cs=tinysrgb&w=1920&dpr=2)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat'
+      },
+      animals_dogs: {
+        backgroundImage: 'url(https://images.pexels.com/photos/1805164/pexels-photo-1805164.jpeg?auto=compress&cs=tinysrgb&w=1920&dpr=2)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat'
+      },
+
       abstract_colors: {
-        backgroundImage: 'url(https://images.pexels.com/photos/2693212/pexels-photo-2693212.png?auto=compress&cs=tinysrgb&w=1920)',
+        backgroundImage: 'url(https://images.pexels.com/photos/2693208/pexels-photo-2693208.png?auto=compress&cs=tinysrgb&w=1920&dpr=2)',
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat'
       },
       abstract_waves: {
-        backgroundImage: 'url(https://images.pexels.com/photos/1269968/pexels-photo-1269968.jpeg?auto=compress&cs=tinysrgb&w=1920)',
+        backgroundImage: 'url(https://images.pexels.com/photos/1103970/pexels-photo-1103970.jpeg?auto=compress&cs=tinysrgb&w=1920&dpr=2)',
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat'
       },
+      abstract_geometric: {
+        backgroundImage: 'url(https://images.pexels.com/photos/3165335/pexels-photo-3165335.jpeg?auto=compress&cs=tinysrgb&w=1920&dpr=2)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat'
+      },
+      abstract_fluid: {
+        backgroundImage: 'url(https://images.pexels.com/photos/1509582/pexels-photo-1509582.jpeg?auto=compress&cs=tinysrgb&w=1920&dpr=2)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat'
+      },
+      abstract_marble: {
+        backgroundImage: 'url(https://images.pexels.com/photos/1000593/pexels-photo-1000593.jpeg?auto=compress&cs=tinysrgb&w=1920&dpr=2)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat'
+      },
+
       sky_sunset: {
-        backgroundImage: 'url(https://images.pexels.com/photos/531756/pexels-photo-531756.jpeg?auto=compress&cs=tinysrgb&w=1920)',
+        backgroundImage: 'url(https://images.pexels.com/photos/158163/clouds-cloudporn-weather-lookup-158163.jpeg?auto=compress&cs=tinysrgb&w=1920&dpr=2)',
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat'
       },
       sky_clouds: {
-        backgroundImage: 'url(https://images.pexels.com/photos/209831/pexels-photo-209831.jpeg?auto=compress&cs=tinysrgb&w=1920)',
+        backgroundImage: 'url(https://images.pexels.com/photos/531767/pexels-photo-531767.jpeg?auto=compress&cs=tinysrgb&w=1920&dpr=2)',
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat'
       },
+      sky_sunrise: {
+        backgroundImage: 'url(https://images.pexels.com/photos/1431822/pexels-photo-1431822.jpeg?auto=compress&cs=tinysrgb&w=1920&dpr=2)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat'
+      },
+      sky_storm: {
+        backgroundImage: 'url(https://images.pexels.com/photos/1054218/pexels-photo-1054218.jpeg?auto=compress&cs=tinysrgb&w=1920&dpr=2)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat'
+      },
+      sky_blue: {
+        backgroundImage: 'url(https://images.pexels.com/photos/281260/pexels-photo-281260.jpeg?auto=compress&cs=tinysrgb&w=1920&dpr=2)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat'
+      },
+
       universe_galaxy: {
-        backgroundImage: 'url(https://images.pexels.com/photos/1169754/pexels-photo-1169754.jpeg?auto=compress&cs=tinysrgb&w=1920)',
+        backgroundImage: 'url(https://images.pexels.com/photos/1169754/pexels-photo-1169754.jpeg?auto=compress&cs=tinysrgb&w=1920&dpr=2)',
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat'
       },
       universe_stars: {
-        backgroundImage: 'url(https://images.pexels.com/photos/1252890/pexels-photo-1252890.jpeg?auto=compress&cs=tinysrgb&w=1920)',
+        backgroundImage: 'url(https://images.pexels.com/photos/1252890/pexels-photo-1252890.jpeg?auto=compress&cs=tinysrgb&w=1920&dpr=2)',
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat'
       },
+      universe_nebula: {
+        backgroundImage: 'url(https://images.pexels.com/photos/816608/pexels-photo-816608.jpeg?auto=compress&cs=tinysrgb&w=1920&dpr=2)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat'
+      },
+      universe_moon: {
+        backgroundImage: 'url(https://images.pexels.com/photos/1246437/pexels-photo-1246437.jpeg?auto=compress&cs=tinysrgb&w=1920&dpr=2)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat'
+      },
+      universe_aurora: {
+        backgroundImage: 'url(https://images.pexels.com/photos/1933316/pexels-photo-1933316.jpeg?auto=compress&cs=tinysrgb&w=1920&dpr=2)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat'
+      },
+
       solid: { background: '#ffffff' },
     };
     return backgrounds[bg] || backgrounds.gradient;
@@ -723,10 +854,13 @@ export function ChatBot() {
                       <div className="space-y-4">
                         <div>
                           <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">Nature</p>
-                          <div className="grid grid-cols-2 gap-2">
+                          <div className="grid grid-cols-3 gap-2">
                             {[
-                              { id: 'nature_waterfall', name: 'Waterfall', preview: 'https://images.pexels.com/photos/1437468/pexels-photo-1437468.jpeg?auto=compress&cs=tinysrgb&w=400' },
-                              { id: 'nature_forest', name: 'Forest', preview: 'https://images.pexels.com/photos/1179229/pexels-photo-1179229.jpeg?auto=compress&cs=tinysrgb&w=400' },
+                              { id: 'nature_waterfall', name: 'Waterfall', preview: 'https://images.pexels.com/photos/2132126/pexels-photo-2132126.jpeg?auto=compress&cs=tinysrgb&w=400' },
+                              { id: 'nature_forest', name: 'Forest', preview: 'https://images.pexels.com/photos/1576161/pexels-photo-1576161.jpeg?auto=compress&cs=tinysrgb&w=400' },
+                              { id: 'nature_mountains', name: 'Mountains', preview: 'https://images.pexels.com/photos/1266810/pexels-photo-1266810.jpeg?auto=compress&cs=tinysrgb&w=400' },
+                              { id: 'nature_lake', name: 'Lake', preview: 'https://images.pexels.com/photos/1438761/pexels-photo-1438761.jpeg?auto=compress&cs=tinysrgb&w=400' },
+                              { id: 'nature_beach', name: 'Beach', preview: 'https://images.pexels.com/photos/1032650/pexels-photo-1032650.jpeg?auto=compress&cs=tinysrgb&w=400' },
                             ].map((bg) => (
                               <button
                                 key={bg.id}
@@ -737,7 +871,7 @@ export function ChatBot() {
                                     : 'hover:scale-105'
                                 }`}
                               >
-                                <img src={bg.preview} alt={bg.name} className="h-20 w-full object-cover rounded-lg mb-1" />
+                                <img src={bg.preview} alt={bg.name} className="h-16 w-full object-cover rounded-lg mb-1" />
                                 <p className="text-xs font-medium text-gray-700">{bg.name}</p>
                                 {chatBackground === bg.id && (
                                   <div className="absolute top-3 right-3 w-3 h-3 bg-pink-500 rounded-full border-2 border-white"></div>
@@ -749,10 +883,13 @@ export function ChatBot() {
 
                         <div>
                           <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">Animals</p>
-                          <div className="grid grid-cols-2 gap-2">
+                          <div className="grid grid-cols-3 gap-2">
                             {[
-                              { id: 'animals_butterfly', name: 'Butterfly', preview: 'https://images.pexels.com/photos/1496373/pexels-photo-1496373.jpeg?auto=compress&cs=tinysrgb&w=400' },
-                              { id: 'animals_birds', name: 'Birds', preview: 'https://images.pexels.com/photos/1661179/pexels-photo-1661179.jpeg?auto=compress&cs=tinysrgb&w=400' },
+                              { id: 'animals_butterfly', name: 'Butterfly', preview: 'https://images.pexels.com/photos/56866/garden-flower-butterfly-summer-56866.jpeg?auto=compress&cs=tinysrgb&w=400' },
+                              { id: 'animals_birds', name: 'Birds', preview: 'https://images.pexels.com/photos/349758/hummingbird-bird-birds-349758.jpeg?auto=compress&cs=tinysrgb&w=400' },
+                              { id: 'animals_deer', name: 'Deer', preview: 'https://images.pexels.com/photos/247376/pexels-photo-247376.jpeg?auto=compress&cs=tinysrgb&w=400' },
+                              { id: 'animals_cats', name: 'Cats', preview: 'https://images.pexels.com/photos/1170986/pexels-photo-1170986.jpeg?auto=compress&cs=tinysrgb&w=400' },
+                              { id: 'animals_dogs', name: 'Dogs', preview: 'https://images.pexels.com/photos/1805164/pexels-photo-1805164.jpeg?auto=compress&cs=tinysrgb&w=400' },
                             ].map((bg) => (
                               <button
                                 key={bg.id}
@@ -763,7 +900,7 @@ export function ChatBot() {
                                     : 'hover:scale-105'
                                 }`}
                               >
-                                <img src={bg.preview} alt={bg.name} className="h-20 w-full object-cover rounded-lg mb-1" />
+                                <img src={bg.preview} alt={bg.name} className="h-16 w-full object-cover rounded-lg mb-1" />
                                 <p className="text-xs font-medium text-gray-700">{bg.name}</p>
                                 {chatBackground === bg.id && (
                                   <div className="absolute top-3 right-3 w-3 h-3 bg-pink-500 rounded-full border-2 border-white"></div>
@@ -775,10 +912,13 @@ export function ChatBot() {
 
                         <div>
                           <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">Abstract</p>
-                          <div className="grid grid-cols-2 gap-2">
+                          <div className="grid grid-cols-3 gap-2">
                             {[
-                              { id: 'abstract_colors', name: 'Colors', preview: 'https://images.pexels.com/photos/2693212/pexels-photo-2693212.png?auto=compress&cs=tinysrgb&w=400' },
-                              { id: 'abstract_waves', name: 'Waves', preview: 'https://images.pexels.com/photos/1269968/pexels-photo-1269968.jpeg?auto=compress&cs=tinysrgb&w=400' },
+                              { id: 'abstract_colors', name: 'Colors', preview: 'https://images.pexels.com/photos/2693208/pexels-photo-2693208.png?auto=compress&cs=tinysrgb&w=400' },
+                              { id: 'abstract_waves', name: 'Waves', preview: 'https://images.pexels.com/photos/1103970/pexels-photo-1103970.jpeg?auto=compress&cs=tinysrgb&w=400' },
+                              { id: 'abstract_geometric', name: 'Geometric', preview: 'https://images.pexels.com/photos/3165335/pexels-photo-3165335.jpeg?auto=compress&cs=tinysrgb&w=400' },
+                              { id: 'abstract_fluid', name: 'Fluid', preview: 'https://images.pexels.com/photos/1509582/pexels-photo-1509582.jpeg?auto=compress&cs=tinysrgb&w=400' },
+                              { id: 'abstract_marble', name: 'Marble', preview: 'https://images.pexels.com/photos/1000593/pexels-photo-1000593.jpeg?auto=compress&cs=tinysrgb&w=400' },
                             ].map((bg) => (
                               <button
                                 key={bg.id}
@@ -789,7 +929,7 @@ export function ChatBot() {
                                     : 'hover:scale-105'
                                 }`}
                               >
-                                <img src={bg.preview} alt={bg.name} className="h-20 w-full object-cover rounded-lg mb-1" />
+                                <img src={bg.preview} alt={bg.name} className="h-16 w-full object-cover rounded-lg mb-1" />
                                 <p className="text-xs font-medium text-gray-700">{bg.name}</p>
                                 {chatBackground === bg.id && (
                                   <div className="absolute top-3 right-3 w-3 h-3 bg-pink-500 rounded-full border-2 border-white"></div>
@@ -801,12 +941,18 @@ export function ChatBot() {
 
                         <div>
                           <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">Sky & Universe</p>
-                          <div className="grid grid-cols-2 gap-2">
+                          <div className="grid grid-cols-3 gap-2">
                             {[
-                              { id: 'sky_sunset', name: 'Sunset', preview: 'https://images.pexels.com/photos/531756/pexels-photo-531756.jpeg?auto=compress&cs=tinysrgb&w=400' },
-                              { id: 'sky_clouds', name: 'Clouds', preview: 'https://images.pexels.com/photos/209831/pexels-photo-209831.jpeg?auto=compress&cs=tinysrgb&w=400' },
+                              { id: 'sky_sunset', name: 'Sunset', preview: 'https://images.pexels.com/photos/158163/clouds-cloudporn-weather-lookup-158163.jpeg?auto=compress&cs=tinysrgb&w=400' },
+                              { id: 'sky_clouds', name: 'Clouds', preview: 'https://images.pexels.com/photos/531767/pexels-photo-531767.jpeg?auto=compress&cs=tinysrgb&w=400' },
+                              { id: 'sky_sunrise', name: 'Sunrise', preview: 'https://images.pexels.com/photos/1431822/pexels-photo-1431822.jpeg?auto=compress&cs=tinysrgb&w=400' },
+                              { id: 'sky_storm', name: 'Storm', preview: 'https://images.pexels.com/photos/1054218/pexels-photo-1054218.jpeg?auto=compress&cs=tinysrgb&w=400' },
+                              { id: 'sky_blue', name: 'Blue Sky', preview: 'https://images.pexels.com/photos/281260/pexels-photo-281260.jpeg?auto=compress&cs=tinysrgb&w=400' },
                               { id: 'universe_galaxy', name: 'Galaxy', preview: 'https://images.pexels.com/photos/1169754/pexels-photo-1169754.jpeg?auto=compress&cs=tinysrgb&w=400' },
                               { id: 'universe_stars', name: 'Stars', preview: 'https://images.pexels.com/photos/1252890/pexels-photo-1252890.jpeg?auto=compress&cs=tinysrgb&w=400' },
+                              { id: 'universe_nebula', name: 'Nebula', preview: 'https://images.pexels.com/photos/816608/pexels-photo-816608.jpeg?auto=compress&cs=tinysrgb&w=400' },
+                              { id: 'universe_moon', name: 'Moon', preview: 'https://images.pexels.com/photos/1246437/pexels-photo-1246437.jpeg?auto=compress&cs=tinysrgb&w=400' },
+                              { id: 'universe_aurora', name: 'Aurora', preview: 'https://images.pexels.com/photos/1933316/pexels-photo-1933316.jpeg?auto=compress&cs=tinysrgb&w=400' },
                             ].map((bg) => (
                               <button
                                 key={bg.id}
@@ -817,7 +963,7 @@ export function ChatBot() {
                                     : 'hover:scale-105'
                                 }`}
                               >
-                                <img src={bg.preview} alt={bg.name} className="h-20 w-full object-cover rounded-lg mb-1" />
+                                <img src={bg.preview} alt={bg.name} className="h-16 w-full object-cover rounded-lg mb-1" />
                                 <p className="text-xs font-medium text-gray-700">{bg.name}</p>
                                 {chatBackground === bg.id && (
                                   <div className="absolute top-3 right-3 w-3 h-3 bg-pink-500 rounded-full border-2 border-white"></div>
@@ -829,7 +975,7 @@ export function ChatBot() {
 
                         <div>
                           <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">Simple</p>
-                          <div className="grid grid-cols-2 gap-2">
+                          <div className="grid grid-cols-3 gap-2">
                             {[
                               { id: 'gradient', name: 'Gradient', preview: null, previewStyle: 'bg-gradient-to-br from-pink-100 via-purple-100 to-blue-100' },
                               { id: 'solid', name: 'Clean', preview: null, previewStyle: 'bg-white border-2 border-gray-200' },
@@ -844,9 +990,9 @@ export function ChatBot() {
                                 }`}
                               >
                                 {bg.preview ? (
-                                  <img src={bg.preview} alt={bg.name} className="h-20 w-full object-cover rounded-lg mb-1" />
+                                  <img src={bg.preview} alt={bg.name} className="h-16 w-full object-cover rounded-lg mb-1" />
                                 ) : (
-                                  <div className={`h-20 w-full rounded-lg mb-1 ${bg.previewStyle}`}></div>
+                                  <div className={`h-16 w-full rounded-lg mb-1 ${bg.previewStyle}`}></div>
                                 )}
                                 <p className="text-xs font-medium text-gray-700">{bg.name}</p>
                                 {chatBackground === bg.id && (
@@ -855,6 +1001,49 @@ export function ChatBot() {
                               </button>
                             ))}
                           </div>
+                        </div>
+
+                        {customBackgrounds.length > 0 && (
+                          <div>
+                            <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">Custom Uploads</p>
+                            <div className="grid grid-cols-3 gap-2">
+                              {customBackgrounds.map((bg, index) => (
+                                <button
+                                  key={`custom_${index}`}
+                                  onClick={() => updateChatBackground(`custom_${bg}`)}
+                                  className={`relative p-2 rounded-xl transition-all overflow-hidden ${
+                                    chatBackground === `custom_${bg}`
+                                      ? 'ring-2 ring-pink-400 scale-105'
+                                      : 'hover:scale-105'
+                                  }`}
+                                >
+                                  <img src={bg} alt="Custom" className="h-16 w-full object-cover rounded-lg mb-1" />
+                                  <p className="text-xs font-medium text-gray-700">Custom {index + 1}</p>
+                                  {chatBackground === `custom_${bg}` && (
+                                    <div className="absolute top-3 right-3 w-3 h-3 bg-pink-500 rounded-full border-2 border-white"></div>
+                                  )}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        <div>
+                          <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">Upload Custom Image</p>
+                          <label className="block">
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={handleCustomImageUpload}
+                              className="hidden"
+                              id="custom-bg-upload"
+                            />
+                            <div className="cursor-pointer p-4 border-2 border-dashed border-gray-300 rounded-xl hover:border-pink-400 transition-all text-center">
+                              <Palette className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                              <p className="text-sm font-medium text-gray-700">Click to upload</p>
+                              <p className="text-xs text-gray-500 mt-1">Max 5MB, HD/4K recommended</p>
+                            </div>
+                          </label>
                         </div>
                       </div>
                     </div>
