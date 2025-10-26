@@ -11,6 +11,23 @@ const reframingPrompts = [
   "That's tough. What strength are you discovering in yourself through this?",
 ];
 
+type VoiceOption = {
+  name: string;
+  label: string;
+  lang: string;
+  gender: 'female' | 'male' | 'child';
+  description: string;
+};
+
+const voiceOptions: VoiceOption[] = [
+  { name: 'Google UK English Female', label: 'Emily (Soft & Warm)', lang: 'en-GB', gender: 'female', description: 'Natural British female voice' },
+  { name: 'Google US English Female', label: 'Sarah (Friendly)', lang: 'en-US', gender: 'female', description: 'Warm American female voice' },
+  { name: 'Microsoft Zira Desktop', label: 'Zira (Professional)', lang: 'en-US', gender: 'female', description: 'Clear professional voice' },
+  { name: 'Google UK English Male', label: 'James (Calm)', lang: 'en-GB', gender: 'male', description: 'Soothing British male voice' },
+  { name: 'Google US English Male', label: 'David (Strong)', lang: 'en-US', gender: 'male', description: 'Confident American male voice' },
+  { name: 'child', label: 'Alex (Playful)', lang: 'en-US', gender: 'child', description: 'Young and energetic voice' },
+];
+
 export function ChatBot() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [sessions, setSessions] = useState<ChatSession[]>([]);
@@ -20,16 +37,43 @@ export function ChatBot() {
   const [isRecording, setIsRecording] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [voiceEnabled, setVoiceEnabled] = useState(true);
+  const [selectedVoice, setSelectedVoice] = useState<string | null>(null);
+  const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [showSidebar, setShowSidebar] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
 
   useEffect(() => {
     if (user) {
       loadSessions();
     }
+
+    const loadVoices = () => {
+      const voices = window.speechSynthesis.getVoices();
+      setAvailableVoices(voices);
+
+      if (profile?.voice_preference) {
+        setSelectedVoice(profile.voice_preference);
+      } else {
+        const femaleVoice = voices.find(v =>
+          v.name.toLowerCase().includes('female') ||
+          v.name.toLowerCase().includes('zira') ||
+          v.name.toLowerCase().includes('samantha')
+        );
+        if (femaleVoice) {
+          setSelectedVoice(femaleVoice.name);
+        }
+      }
+
+      if (profile?.voice_enabled !== undefined) {
+        setVoiceEnabled(profile.voice_enabled);
+      }
+    };
+
+    loadVoices();
+    window.speechSynthesis.onvoiceschanged = loadVoices;
 
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
       const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -275,8 +319,16 @@ export function ChatBot() {
   const speakText = (text: string) => {
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = 0.9;
-    utterance.pitch = 1;
+
+    if (selectedVoice) {
+      const voice = availableVoices.find(v => v.name === selectedVoice);
+      if (voice) {
+        utterance.voice = voice;
+      }
+    }
+
+    utterance.rate = 0.85;
+    utterance.pitch = 1.05;
     utterance.volume = 1;
 
     utterance.onstart = () => setIsSpeaking(true);
@@ -284,6 +336,28 @@ export function ChatBot() {
     utterance.onerror = () => setIsSpeaking(false);
 
     window.speechSynthesis.speak(utterance);
+  };
+
+  const updateVoicePreference = async (voiceName: string) => {
+    if (!user) return;
+
+    setSelectedVoice(voiceName);
+
+    await supabase
+      .from('profiles')
+      .update({ voice_preference: voiceName })
+      .eq('id', user.id);
+  };
+
+  const updateVoiceEnabled = async (enabled: boolean) => {
+    if (!user) return;
+
+    setVoiceEnabled(enabled);
+
+    await supabase
+      .from('profiles')
+      .update({ voice_enabled: enabled })
+      .eq('id', user.id);
   };
 
   const stopSpeaking = () => {
@@ -390,13 +464,14 @@ export function ChatBot() {
               <div className="space-y-6">
                 <div className="bg-gray-50 rounded-2xl p-6">
                   <h3 className="text-lg font-semibold text-gray-800 mb-4">Voice Settings</h3>
-                  <div className="flex items-center justify-between">
+
+                  <div className="flex items-center justify-between mb-6">
                     <div>
                       <p className="text-sm font-medium text-gray-700">Voice Responses</p>
                       <p className="text-xs text-gray-500">Hear AI responses read aloud</p>
                     </div>
                     <button
-                      onClick={() => setVoiceEnabled(!voiceEnabled)}
+                      onClick={() => updateVoiceEnabled(!voiceEnabled)}
                       className={`relative w-12 h-6 rounded-full transition-all ${
                         voiceEnabled ? 'bg-gradient-to-r from-pink-500 to-purple-500' : 'bg-gray-300'
                       }`}
@@ -406,6 +481,113 @@ export function ChatBot() {
                           voiceEnabled ? 'transform translate-x-6' : ''
                         }`}
                       />
+                    </button>
+                  </div>
+
+                  <div className="space-y-3">
+                    <p className="text-sm font-medium text-gray-700 mb-2">Select Voice</p>
+
+                    <div className="space-y-2">
+                      <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Female Voices</p>
+                      {voiceOptions.filter(v => v.gender === 'female').map((voiceOption) => {
+                        const actualVoice = availableVoices.find(v =>
+                          v.name.includes(voiceOption.name) || v.name === voiceOption.name
+                        );
+                        if (!actualVoice) return null;
+
+                        return (
+                          <button
+                            key={voiceOption.name}
+                            onClick={() => updateVoicePreference(actualVoice.name)}
+                            className={`w-full text-left p-3 rounded-xl transition-all ${
+                              selectedVoice === actualVoice.name
+                                ? 'bg-gradient-to-r from-pink-100 to-purple-100 border-2 border-pink-300'
+                                : 'bg-white hover:bg-gray-50 border border-gray-200'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="text-sm font-medium text-gray-800">{voiceOption.label}</p>
+                                <p className="text-xs text-gray-500">{voiceOption.description}</p>
+                              </div>
+                              {selectedVoice === actualVoice.name && (
+                                <div className="w-2 h-2 bg-pink-500 rounded-full"></div>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <div className="space-y-2 mt-4">
+                      <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Male Voices</p>
+                      {voiceOptions.filter(v => v.gender === 'male').map((voiceOption) => {
+                        const actualVoice = availableVoices.find(v =>
+                          v.name.includes(voiceOption.name) || v.name === voiceOption.name
+                        );
+                        if (!actualVoice) return null;
+
+                        return (
+                          <button
+                            key={voiceOption.name}
+                            onClick={() => updateVoicePreference(actualVoice.name)}
+                            className={`w-full text-left p-3 rounded-xl transition-all ${
+                              selectedVoice === actualVoice.name
+                                ? 'bg-gradient-to-r from-blue-100 to-indigo-100 border-2 border-blue-300'
+                                : 'bg-white hover:bg-gray-50 border border-gray-200'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="text-sm font-medium text-gray-800">{voiceOption.label}</p>
+                                <p className="text-xs text-gray-500">{voiceOption.description}</p>
+                              </div>
+                              {selectedVoice === actualVoice.name && (
+                                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <div className="space-y-2 mt-4">
+                      <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Child Voices</p>
+                      {availableVoices
+                        .filter(v =>
+                          v.name.toLowerCase().includes('child') ||
+                          v.name.toLowerCase().includes('junior') ||
+                          (v.name.toLowerCase().includes('alex') && !v.name.toLowerCase().includes('alexa'))
+                        )
+                        .slice(0, 2)
+                        .map((voice) => (
+                          <button
+                            key={voice.name}
+                            onClick={() => updateVoicePreference(voice.name)}
+                            className={`w-full text-left p-3 rounded-xl transition-all ${
+                              selectedVoice === voice.name
+                                ? 'bg-gradient-to-r from-green-100 to-teal-100 border-2 border-green-300'
+                                : 'bg-white hover:bg-gray-50 border border-gray-200'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="text-sm font-medium text-gray-800">{voice.name}</p>
+                                <p className="text-xs text-gray-500">Playful and energetic</p>
+                              </div>
+                              {selectedVoice === voice.name && (
+                                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                              )}
+                            </div>
+                          </button>
+                        ))}
+                    </div>
+
+                    <button
+                      onClick={() => speakText('Hello! This is how I sound. I\'m here to support you on your mental wellness journey.')}
+                      className="w-full mt-4 px-4 py-2 bg-gradient-to-r from-pink-500 via-purple-500 to-blue-500 text-white rounded-xl hover:shadow-lg transition-all active:scale-95 text-sm font-medium"
+                    >
+                      Test Voice
                     </button>
                   </div>
                 </div>
@@ -436,7 +618,7 @@ export function ChatBot() {
                 </div>
                 <button
                   onClick={() => {
-                    setVoiceEnabled(!voiceEnabled);
+                    updateVoiceEnabled(!voiceEnabled);
                     if (isSpeaking) stopSpeaking();
                   }}
                   className="w-10 h-10 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-white/30 transition-all active:scale-95"
