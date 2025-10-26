@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { BookOpen, ChevronLeft, ChevronRight, Calendar, Mic, MicOff, Trash2, Edit3, Check, X, Settings, Save } from 'lucide-react';
+import { BookOpen, ChevronLeft, ChevronRight, Calendar, Mic, MicOff, Trash2, Edit3, Check, X, Settings, Save, History } from 'lucide-react';
 import { supabase, JournalEntry } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -16,8 +16,12 @@ export function Journal({ onOpenSettings }: JournalProps = {}) {
   const [editingTitle, setEditingTitle] = useState(false);
   const [tempTitle, setTempTitle] = useState('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteEntryId, setDeleteEntryId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const [showSidebar, setShowSidebar] = useState(false);
+  const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState('');
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
   const recognitionRef = useRef<any>(null);
   const recordedTextRef = useRef<string>('');
@@ -114,19 +118,44 @@ export function Journal({ onOpenSettings }: JournalProps = {}) {
     setIsSaving(false);
   };
 
-  const deleteEntry = async () => {
-    if (!currentEntry) return;
+  const deleteEntry = async (entryId: string) => {
+    if (!user) return;
 
     const { error } = await supabase
       .from('journal_entries')
       .delete()
-      .eq('id', currentEntry.id);
+      .eq('id', entryId)
+      .eq('user_id', user.id);
 
     if (!error) {
-      setEntries(prev => prev.filter(e => e.id !== currentEntry.id));
-      setCurrentEntry(null);
-      setContent('');
+      setEntries(prev => prev.filter(e => e.id !== entryId));
+
+      if (currentEntry?.id === entryId) {
+        setCurrentEntry(null);
+        setContent('');
+        setSelectedDate(new Date().toISOString().split('T')[0]);
+      }
+
       setShowDeleteConfirm(false);
+      setDeleteEntryId(null);
+    }
+  };
+
+  const updateEntryTitleInSidebar = async (entryId: string, newTitle: string) => {
+    if (!user || !newTitle.trim()) {
+      setEditingEntryId(null);
+      return;
+    }
+
+    const { error } = await supabase
+      .from('journal_entries')
+      .update({ title: newTitle.trim() })
+      .eq('id', entryId)
+      .eq('user_id', user.id);
+
+    if (!error) {
+      setEditingEntryId(null);
+      await loadJournalEntries();
     }
   };
 
@@ -223,6 +252,131 @@ export function Journal({ onOpenSettings }: JournalProps = {}) {
 
   return (
     <div className="flex h-full bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
+      <div className={`${showSidebar ? 'w-72' : 'w-16'} bg-white/80 backdrop-blur-sm border-r border-gray-200 transition-all duration-300 flex flex-col`}>
+        <div className="p-4 border-b border-gray-200">
+          <button
+            onClick={() => setShowSidebar(!showSidebar)}
+            className="w-full flex items-center gap-2 px-3 py-2 hover:bg-blue-50 rounded-xl transition-all active:scale-95"
+            title="Toggle History"
+          >
+            <History className="w-5 h-5 text-blue-600" />
+            {showSidebar && <span className="text-sm font-medium text-gray-700">History</span>}
+          </button>
+        </div>
+
+        {showSidebar && (
+          <div className="flex-1 overflow-y-auto p-2">
+            <div className="space-y-2">
+              {entries.length === 0 ? (
+                <p className="text-sm text-gray-500 text-center py-4">No entries yet</p>
+              ) : (
+                entries.map((entry) => (
+                  <div
+                    key={entry.id}
+                    className={`group relative p-3 rounded-xl cursor-pointer transition-all ${
+                      currentEntry?.id === entry.id
+                        ? 'bg-gradient-to-r from-blue-100 to-cyan-100 border-2 border-blue-300'
+                        : 'hover:bg-gray-50 border border-gray-200'
+                    }`}
+                    onClick={() => {
+                      setSelectedDate(entry.entry_date);
+                      setCurrentEntry(entry);
+                      setContent(entry.content);
+                      setTempTitle(entry.title);
+                    }}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        {editingEntryId === entry.id ? (
+                          <input
+                            type="text"
+                            value={editTitle}
+                            onChange={(e) => setEditTitle(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                updateEntryTitleInSidebar(entry.id, editTitle);
+                              } else if (e.key === 'Escape') {
+                                setEditingEntryId(null);
+                              }
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="w-full px-2 py-1 text-xs border border-blue-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            autoFocus
+                          />
+                        ) : (
+                          <>
+                            <p className="text-sm font-medium text-gray-900 truncate">{entry.title}</p>
+                            <p className="text-xs text-gray-500 mt-1">
+                              {new Date(entry.entry_date).toLocaleDateString('en-US', {
+                                month: 'short',
+                                day: 'numeric',
+                                year: 'numeric'
+                              })}
+                            </p>
+                          </>
+                        )}
+                      </div>
+
+                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        {editingEntryId === entry.id ? (
+                          <>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                updateEntryTitleInSidebar(entry.id, editTitle);
+                              }}
+                              className="p-1 hover:bg-green-100 text-green-600 rounded transition-all"
+                              title="Save"
+                            >
+                              <Check className="w-3 h-3" />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingEntryId(null);
+                              }}
+                              className="p-1 hover:bg-red-100 text-red-600 rounded transition-all"
+                              title="Cancel"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingEntryId(entry.id);
+                                setEditTitle(entry.title);
+                              }}
+                              className="p-1 hover:bg-blue-100 text-blue-600 rounded transition-all"
+                              title="Edit Title"
+                            >
+                              <Edit3 className="w-3 h-3" />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDeleteEntryId(entry.id);
+                                setShowDeleteConfirm(true);
+                              }}
+                              className="p-1 hover:bg-red-100 text-red-600 rounded transition-all"
+                              title="Delete"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
       <div className="flex-1 flex flex-col max-w-5xl mx-auto w-full">
         <div className="bg-white/80 backdrop-blur-sm shadow-lg border-b border-gray-200">
           <div className="p-6">
@@ -252,7 +406,10 @@ export function Journal({ onOpenSettings }: JournalProps = {}) {
                       {isSaving ? 'Saving...' : 'Save'}
                     </button>
                     <button
-                      onClick={() => setShowDeleteConfirm(true)}
+                      onClick={() => {
+                        setDeleteEntryId(currentEntry.id);
+                        setShowDeleteConfirm(true);
+                      }}
                       className="p-2 hover:bg-red-100 text-red-600 rounded-lg transition-all active:scale-95"
                       title="Delete Entry"
                     >
@@ -387,7 +544,7 @@ export function Journal({ onOpenSettings }: JournalProps = {}) {
         </div>
       </div>
 
-      {showDeleteConfirm && (
+      {showDeleteConfirm && deleteEntryId && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl p-6 max-w-md mx-4 shadow-2xl">
             <h3 className="text-lg font-semibold text-gray-900 mb-2">Delete Journal Entry?</h3>
@@ -396,13 +553,16 @@ export function Journal({ onOpenSettings }: JournalProps = {}) {
             </p>
             <div className="flex gap-3">
               <button
-                onClick={() => setShowDeleteConfirm(false)}
+                onClick={() => {
+                  setShowDeleteConfirm(false);
+                  setDeleteEntryId(null);
+                }}
                 className="flex-1 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-all"
               >
                 Cancel
               </button>
               <button
-                onClick={deleteEntry}
+                onClick={() => deleteEntry(deleteEntryId)}
                 className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-all"
               >
                 Delete

@@ -236,18 +236,32 @@ export function ChatBot() {
   const deleteSession = async (sessionId: string) => {
     if (!user) return;
 
-    await supabase
+    const { error } = await supabase
       .from('chat_sessions')
       .delete()
-      .eq('id', sessionId);
+      .eq('id', sessionId)
+      .eq('user_id', user.id);
 
-    setSessions(prev => prev.filter(s => s.id !== sessionId));
+    if (error) {
+      console.error('Error deleting session:', error);
+      return;
+    }
+
+    await supabase
+      .from('chat_messages')
+      .delete()
+      .eq('session_id', sessionId)
+      .eq('user_id', user.id);
+
+    const updatedSessions = sessions.filter(s => s.id !== sessionId);
+    setSessions(updatedSessions);
 
     if (currentSessionId === sessionId) {
-      const remainingSessions = sessions.filter(s => s.id !== sessionId);
-      if (remainingSessions.length > 0) {
-        setCurrentSessionId(remainingSessions[0].id);
+      if (updatedSessions.length > 0) {
+        setCurrentSessionId(updatedSessions[0].id);
       } else {
+        setCurrentSessionId(null);
+        setMessages([]);
         createNewSession();
       }
     }
