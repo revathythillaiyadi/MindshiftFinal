@@ -718,7 +718,7 @@ export function ChatBot() {
   ];
 
   if (journalMode === 'journal') {
-    return <Journal />;
+    return <Journal onBackToAssistant={() => setJournalMode('reframe')} />;
   }
 
   return (

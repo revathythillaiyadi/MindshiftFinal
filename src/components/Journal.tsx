@@ -1,7 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
-import { BookOpen, Send, ChevronLeft, ChevronRight, Calendar, Mic, MicOff, Trash2, Edit3, Check, X } from 'lucide-react';
+import { BookOpen, Send, ChevronLeft, ChevronRight, Calendar, Mic, MicOff, Trash2, Edit3, Check, X, Settings } from 'lucide-react';
 import { supabase, ChatMessage, ChatSession } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+
+interface JournalProps {
+  onBackToAssistant?: () => void;
+}
 
 const reflectiveResponses = [
   "I see.",
@@ -23,7 +27,7 @@ const journalPrompts = [
   "Describe a sensation you felt today without naming the emotion.",
 ];
 
-export function Journal() {
+export function Journal({ onBackToAssistant }: JournalProps = {}) {
   const [entries, setEntries] = useState<ChatSession[]>([]);
   const [currentEntry, setCurrentEntry] = useState<ChatSession | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -35,8 +39,7 @@ export function Journal() {
   const [tempTitle, setTempTitle] = useState('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
+  const recognitionRef = useRef<any>(null);
   const { user } = useAuth();
 
   useEffect(() => {
@@ -308,52 +311,61 @@ export function Journal() {
 
   const startRecording = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
-      mediaRecorderRef.current = mediaRecorder;
-      audioChunksRef.current = [];
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          audioChunksRef.current.push(event.data);
+      if (!SpeechRecognition) {
+        alert('Speech recognition is not supported in your browser. Please use Chrome or Edge.');
+        return;
+      }
+
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = 'en-US';
+
+      let finalTranscript = '';
+
+      recognition.onresult = (event: any) => {
+        let interimTranscript = '';
+
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const transcript = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            finalTranscript += transcript + ' ';
+          } else {
+            interimTranscript += transcript;
+          }
         }
+
+        setInput(prev => {
+          const baseText = prev.replace(/\[Recording\.\.\.\].*$/, '').trim();
+          const displayText = finalTranscript + interimTranscript;
+          return baseText + (baseText ? ' ' : '') + displayText;
+        });
       };
 
-      mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        await transcribeAudio(audioBlob);
-        stream.getTracks().forEach(track => track.stop());
+      recognition.onerror = (event: any) => {
+        console.error('Speech recognition error:', event.error);
+        setIsRecording(false);
       };
 
-      mediaRecorder.start();
+      recognition.onend = () => {
+        setIsRecording(false);
+      };
+
+      recognitionRef.current = recognition;
+      recognition.start();
       setIsRecording(true);
     } catch (error) {
-      console.error('Error accessing microphone:', error);
-      alert('Could not access microphone. Please check your permissions.');
+      console.error('Error starting speech recognition:', error);
+      alert('Could not start speech recognition. Please check your permissions.');
     }
   };
 
   const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop();
+    if (recognitionRef.current && isRecording) {
+      recognitionRef.current.stop();
       setIsRecording(false);
-    }
-  };
-
-  const transcribeAudio = async (audioBlob: Blob) => {
-    setLoading(true);
-    try {
-      const reader = new FileReader();
-      reader.readAsDataURL(audioBlob);
-      reader.onloadend = () => {
-        const base64Audio = reader.result as string;
-        const transcribedText = '[Voice note recorded - transcription would happen here]';
-        setInput(prev => prev + (prev ? ' ' : '') + transcribedText);
-        setLoading(false);
-      };
-    } catch (error) {
-      console.error('Error transcribing audio:', error);
-      setLoading(false);
     }
   };
 
@@ -393,41 +405,50 @@ export function Journal() {
   };
 
   return (
-    <div className="flex h-full bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50">
+    <div className="flex h-full bg-gradient-to-br from-blue-50 via-sky-50 to-indigo-50">
       <div className="flex-1 flex items-center justify-center p-8">
         <div className="relative w-full max-w-4xl h-full">
-          <div className="absolute inset-0 bg-gradient-to-br from-amber-100 to-orange-100 rounded-3xl shadow-2xl transform rotate-1"></div>
-          <div className="absolute inset-0 bg-white rounded-3xl shadow-2xl border-4 border-amber-200" style={{
+          <div className="absolute inset-0 bg-gradient-to-br from-blue-100 to-sky-100 rounded-3xl shadow-2xl transform rotate-1"></div>
+          <div className="absolute inset-0 bg-white rounded-3xl shadow-2xl border-4 border-blue-200" style={{
             backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 31px, #e5e7eb 31px, #e5e7eb 32px)',
           }}>
             <div className="h-full flex flex-col p-8">
-              <div className="mb-6 pb-4 border-b-2 border-amber-300">
+              <div className="mb-6 pb-4 border-b-2 border-blue-300">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-3">
-                    <BookOpen className="w-8 h-8 text-amber-700" />
+                    <BookOpen className="w-8 h-8 text-blue-700" />
                     <div>
-                      <h1 className="text-2xl font-bold text-amber-900" style={{ fontFamily: 'Georgia, serif' }}>
+                      <h1 className="text-2xl font-bold text-blue-900" style={{ fontFamily: 'Georgia, serif' }}>
                         My Journal
                       </h1>
                       <div className="flex items-center gap-2 mt-1">
                         <button
                           onClick={() => navigateDate('prev')}
-                          className="p-1 hover:bg-amber-100 rounded transition-all"
+                          className="p-1 hover:bg-blue-100 rounded transition-all"
                         >
-                          <ChevronLeft className="w-4 h-4 text-amber-700" />
+                          <ChevronLeft className="w-4 h-4 text-blue-700" />
                         </button>
-                        <p className="text-sm text-amber-700">{formatDate(selectedDate)}</p>
+                        <p className="text-sm text-blue-700">{formatDate(selectedDate)}</p>
                         <button
                           onClick={() => navigateDate('next')}
-                          className="p-1 hover:bg-amber-100 rounded transition-all"
+                          className="p-1 hover:bg-blue-100 rounded transition-all"
                           disabled={selectedDate === new Date().toISOString().split('T')[0]}
                         >
-                          <ChevronRight className="w-4 h-4 text-amber-700" />
+                          <ChevronRight className="w-4 h-4 text-blue-700" />
                         </button>
                       </div>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
+                    {onBackToAssistant && (
+                      <button
+                        onClick={onBackToAssistant}
+                        className="p-2 hover:bg-blue-100 text-blue-600 rounded-lg transition-all active:scale-95"
+                        title="Back to Assistant"
+                      >
+                        <Settings className="w-5 h-5" />
+                      </button>
+                    )}
                     {currentEntry && (
                       <button
                         onClick={() => setShowDeleteConfirm(true)}
@@ -440,7 +461,7 @@ export function Journal() {
                     {!currentEntry && (
                       <button
                         onClick={createNewEntry}
-                        className="px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-xl hover:shadow-lg transition-all active:scale-95 text-sm font-medium"
+                        className="px-4 py-2 bg-gradient-to-r from-blue-500 to-sky-500 text-white rounded-xl hover:shadow-lg transition-all active:scale-95 text-sm font-medium"
                       >
                         Start Writing
                       </button>
@@ -450,7 +471,7 @@ export function Journal() {
 
                 {currentEntry && !editingTitle && (
                   <div className="flex items-center gap-2 mt-2">
-                    <h2 className="text-lg font-semibold text-amber-800" style={{ fontFamily: 'Georgia, serif' }}>
+                    <h2 className="text-lg font-semibold text-blue-800" style={{ fontFamily: 'Georgia, serif' }}>
                       {currentEntry.title}
                     </h2>
                     <button
@@ -458,9 +479,9 @@ export function Journal() {
                         setEditingTitle(true);
                         setTempTitle(currentEntry.title);
                       }}
-                      className="p-1 hover:bg-amber-100 rounded transition-all"
+                      className="p-1 hover:bg-blue-100 rounded transition-all"
                     >
-                      <Edit3 className="w-4 h-4 text-amber-600" />
+                      <Edit3 className="w-4 h-4 text-blue-600" />
                     </button>
                   </div>
                 )}
@@ -471,7 +492,7 @@ export function Journal() {
                       type="text"
                       value={tempTitle}
                       onChange={(e) => setTempTitle(e.target.value)}
-                      className="flex-1 px-3 py-1 border-2 border-amber-300 rounded-lg focus:outline-none focus:border-amber-500"
+                      className="flex-1 px-3 py-1 border-2 border-blue-300 rounded-lg focus:outline-none focus:border-blue-500"
                       style={{ fontFamily: 'Georgia, serif' }}
                       autoFocus
                       onKeyPress={(e) => {
@@ -498,8 +519,8 @@ export function Journal() {
               <div className="flex-1 overflow-y-auto mb-6 space-y-6 pr-2" style={{ scrollbarWidth: 'thin' }}>
                 {messages.length === 0 ? (
                   <div className="text-center py-16">
-                    <BookOpen className="w-16 h-16 text-amber-300 mx-auto mb-4" />
-                    <p className="text-amber-600 italic" style={{ fontFamily: 'Georgia, serif' }}>
+                    <BookOpen className="w-16 h-16 text-blue-300 mx-auto mb-4" />
+                    <p className="text-blue-600 italic" style={{ fontFamily: 'Georgia, serif' }}>
                       {currentEntry ? 'Begin your entry...' : 'No entry for this day yet'}
                     </p>
                   </div>
@@ -514,7 +535,7 @@ export function Journal() {
                           className={`leading-relaxed ${
                             message.role === 'user'
                               ? 'text-gray-900 text-base'
-                              : 'text-amber-800 text-sm italic'
+                              : 'text-blue-800 text-sm italic'
                           }`}
                           style={{
                             fontFamily: message.role === 'user' ? 'Georgia, serif' : 'Brush Script MT, cursive',
@@ -527,10 +548,10 @@ export function Journal() {
                     ))}
 
                     {currentEntry?.summary && messages.filter(m => m.role === 'user').length >= 3 && (
-                      <div className="mt-8 pt-6 border-t-2 border-amber-200">
-                        <p className="text-xs uppercase tracking-wider text-amber-600 mb-2">Daily Reflection</p>
+                      <div className="mt-8 pt-6 border-t-2 border-blue-200">
+                        <p className="text-xs uppercase tracking-wider text-blue-600 mb-2">Daily Reflection</p>
                         <p
-                          className="text-amber-900 italic leading-relaxed"
+                          className="text-blue-900 italic leading-relaxed"
                           style={{
                             fontFamily: 'Brush Script MT, cursive',
                             fontSize: '1.1rem',
@@ -552,7 +573,7 @@ export function Journal() {
                     className={`px-4 py-3 rounded-xl hover:shadow-lg transition-all active:scale-95 ${
                       isRecording
                         ? 'bg-red-500 text-white animate-pulse'
-                        : 'bg-amber-200 text-amber-700 hover:bg-amber-300'
+                        : 'bg-blue-200 text-blue-700 hover:bg-blue-300'
                     }`}
                     title={isRecording ? 'Stop recording' : 'Start voice recording'}
                   >
@@ -563,7 +584,7 @@ export function Journal() {
                     onChange={(e) => setInput(e.target.value)}
                     onKeyPress={handleKeyPress}
                     placeholder="Write your thoughts..."
-                    className="flex-1 px-4 py-3 border-2 border-amber-300 rounded-xl focus:outline-none focus:border-amber-500 resize-none bg-amber-50/50"
+                    className="flex-1 px-4 py-3 border-2 border-blue-300 rounded-xl focus:outline-none focus:border-blue-500 resize-none bg-blue-50/50"
                     style={{
                       fontFamily: 'Georgia, serif',
                       lineHeight: '1.5rem',
@@ -574,7 +595,7 @@ export function Journal() {
                   <button
                     onClick={handleSend}
                     disabled={!input.trim() || loading}
-                    className="px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-xl hover:shadow-lg transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-6 py-3 bg-gradient-to-r from-blue-500 to-sky-500 text-white rounded-xl hover:shadow-lg transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Send className="w-5 h-5" />
                   </button>
@@ -585,10 +606,10 @@ export function Journal() {
         </div>
       </div>
 
-      <div className="w-64 bg-amber-100/50 border-l border-amber-200 p-4 overflow-y-auto">
-        <div className="flex items-center gap-2 mb-4 pb-3 border-b border-amber-300">
-          <Calendar className="w-5 h-5 text-amber-700" />
-          <h3 className="font-semibold text-amber-900">Past Entries</h3>
+      <div className="w-64 bg-blue-100/50 border-l border-blue-200 p-4 overflow-y-auto">
+        <div className="flex items-center gap-2 mb-4 pb-3 border-b border-blue-300">
+          <Calendar className="w-5 h-5 text-blue-700" />
+          <h3 className="font-semibold text-blue-900">Past Entries</h3>
         </div>
         <div className="space-y-2">
           {entries.map((entry) => (
@@ -600,11 +621,11 @@ export function Journal() {
               }}
               className={`w-full text-left p-3 rounded-xl transition-all ${
                 currentEntry?.id === entry.id
-                  ? 'bg-amber-200 border-2 border-amber-400'
-                  : 'bg-white hover:bg-amber-50 border border-amber-200'
+                  ? 'bg-blue-200 border-2 border-blue-400'
+                  : 'bg-white hover:bg-blue-50 border border-blue-200'
               }`}
             >
-              <p className="text-xs text-amber-600 mb-1">
+              <p className="text-xs text-blue-600 mb-1">
                 {entry.entry_date ? formatDate(entry.entry_date) : 'Unknown date'}
               </p>
               {entry.summary && (
