@@ -1,46 +1,27 @@
 import { useState, useEffect, useRef } from 'react';
-import { BookOpen, Send, ChevronLeft, ChevronRight, Calendar, Mic, MicOff, Trash2, Edit3, Check, X, Settings } from 'lucide-react';
-import { supabase, ChatMessage, ChatSession } from '../lib/supabase';
+import { BookOpen, ChevronLeft, ChevronRight, Calendar, Mic, MicOff, Trash2, Edit3, Check, X, Settings, Save } from 'lucide-react';
+import { supabase, JournalEntry } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 
 interface JournalProps {
   onOpenSettings?: () => void;
 }
 
-const reflectiveResponses = [
-  "I see.",
-  "Mmm.",
-  "Tell me more about that.",
-  "I hear you.",
-  "Go on.",
-  "That sounds important.",
-  "I'm listening.",
-];
-
-const journalPrompts = [
-  "What are three feelings that have been present for you today, and where do you feel them in your body?",
-  "Describe one interaction today that lingered in your mind, and what unsaid thing made it stick.",
-  "If this day had a color and a texture, what would they be, and why?",
-  "What's something you noticed today that you usually overlook?",
-  "Write about a moment today when you felt most like yourself.",
-  "What are you carrying today that isn't yours to carry?",
-  "Describe a sensation you felt today without naming the emotion.",
-];
-
 export function Journal({ onOpenSettings }: JournalProps = {}) {
-  const [entries, setEntries] = useState<ChatSession[]>([]);
-  const [currentEntry, setCurrentEntry] = useState<ChatSession | null>(null);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [input, setInput] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [entries, setEntries] = useState<JournalEntry[]>([]);
+  const [currentEntry, setCurrentEntry] = useState<JournalEntry | null>(null);
+  const [content, setContent] = useState('');
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [isRecording, setIsRecording] = useState(false);
   const [editingTitle, setEditingTitle] = useState(false);
   const [tempTitle, setTempTitle] = useState('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const textAreaRef = useRef<HTMLTextAreaElement>(null);
   const recognitionRef = useRef<any>(null);
   const recordedTextRef = useRef<string>('');
+  const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
   const { user } = useAuth();
 
   useEffect(() => {
@@ -50,271 +31,130 @@ export function Journal({ onOpenSettings }: JournalProps = {}) {
   }, [user]);
 
   useEffect(() => {
-    if (currentEntry) {
-      loadMessages(currentEntry.id);
+    const entryForDate = entries.find(e => e.entry_date === selectedDate);
+    if (entryForDate) {
+      setCurrentEntry(entryForDate);
+      setContent(entryForDate.content);
+      setTempTitle(entryForDate.title);
+    } else {
+      setCurrentEntry(null);
+      setContent('');
+      setTempTitle('');
     }
-  }, [currentEntry]);
+  }, [selectedDate, entries]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+    if (currentEntry && content !== currentEntry.content) {
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+      }
+      autoSaveTimerRef.current = setTimeout(() => {
+        saveEntry();
+      }, 2000);
+    }
+    return () => {
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+      }
+    };
+  }, [content]);
 
   const loadJournalEntries = async () => {
     if (!user) return;
 
-    const { data } = await supabase
-      .from('chat_sessions')
+    const { data, error } = await supabase
+      .from('journal_entries')
       .select('*')
       .eq('user_id', user.id)
-      .eq('journal_mode', 'journal')
       .order('entry_date', { ascending: false });
 
-    if (data) {
-      setEntries(data);
-      const todayEntry = data.find(e => e.entry_date === selectedDate);
-      if (todayEntry) {
-        setCurrentEntry(todayEntry);
-      }
-    }
-  };
-
-  const loadMessages = async (sessionId: string) => {
-    if (!user) return;
-
-    const { data } = await supabase
-      .from('chat_messages')
-      .select('*')
-      .eq('user_id', user.id)
-      .eq('session_id', sessionId)
-      .order('created_at', { ascending: true });
-
-    if (data) {
-      setMessages(data);
-    }
-  };
-
-  const createNewEntry = async () => {
-    if (!user) return;
-
-    const existingEntry = entries.find(e => e.entry_date === selectedDate);
-    if (existingEntry) {
-      setCurrentEntry(existingEntry);
-      await loadMessages(existingEntry.id);
-      return;
-    }
-
-    const prompt = journalPrompts[Math.floor(Math.random() * journalPrompts.length)];
-
-    const { data, error } = await supabase
-      .from('chat_sessions')
-      .insert({
-        user_id: user.id,
-        title: `Journal - ${new Date().toLocaleDateString()}`,
-        journal_mode: 'journal',
-        entry_date: selectedDate,
-      })
-      .select()
-      .single();
-
     if (data && !error) {
-      setCurrentEntry(data);
-      setEntries(prev => [data, ...prev]);
-
-      setTimeout(async () => {
-        const assistantMsg: ChatMessage = {
-          id: crypto.randomUUID(),
-          user_id: user.id,
-          session_id: data.id,
-          role: 'assistant',
-          content: prompt,
-          reframed_content: null,
-          is_journal_entry: true,
-          created_at: new Date().toISOString(),
-        };
-
-        setMessages([assistantMsg]);
-
-        await supabase.from('chat_messages').insert({
-          user_id: user.id,
-          session_id: data.id,
-          role: 'assistant',
-          content: prompt,
-          is_journal_entry: true,
-        });
-      }, 500);
+      setEntries(data);
     }
   };
 
-  const generateJournalResponse = (userMessage: string, messageHistory: ChatMessage[]): string => {
-    const lowerMessage = userMessage.toLowerCase();
-    const userMessageCount = messageHistory.filter(m => m.role === 'user').length;
+  const saveEntry = async () => {
+    if (!user || !content.trim()) return;
 
-    if (lowerMessage.includes('advice') || lowerMessage.includes('help me') || lowerMessage.includes('what should')) {
-      return "I hear you, but in this mode, I'm simply here to listen without suggesting anything.";
-    }
+    setIsSaving(true);
 
-    const words = userMessage.split(' ').length;
-
-    if (words < 5) {
-      return reflectiveResponses[Math.floor(Math.random() * reflectiveResponses.length)];
-    }
-
-    const sentences = userMessage.split(/[.!?]+/).filter(s => s.trim().length > 0);
-
-    if (sentences.length === 0) {
-      return reflectiveResponses[Math.floor(Math.random() * reflectiveResponses.length)];
-    }
-
-    const lastSentences = sentences.slice(-2).join('. ');
-
-    if (lowerMessage.includes('feel') || lowerMessage.includes('felt')) {
-      const emotionWords = ['frustrated', 'anxious', 'excited', 'sad', 'happy', 'angry', 'overwhelmed', 'grateful', 'confused', 'tired', 'stressed'];
-      const detectedEmotion = emotionWords.find(e => lowerMessage.includes(e));
-      if (detectedEmotion) {
-        return `It sounds like you're feeling a lot of ${detectedEmotion} over that.`;
-      }
-      return "I hear the emotion in what you're sharing.";
-    }
-
-    if (userMessageCount > 3 && Math.random() > 0.6) {
-      return reflectiveResponses[Math.floor(Math.random() * reflectiveResponses.length)];
-    }
-
-    const summaryStarters = [
-      "So ",
-      "It sounds like ",
-      "What I'm hearing is ",
-    ];
-
-    const starter = summaryStarters[Math.floor(Math.random() * summaryStarters.length)];
-    const summary = lastSentences.toLowerCase()
-      .replace(/^i\s/g, 'you ')
-      .replace(/\si\s/g, ' you ')
-      .replace(/\sme\s/g, ' you ')
-      .replace(/\smy\s/g, ' your ')
-      .replace(/^my\s/g, 'your ');
-
-    return `${starter}${summary}`;
-  };
-
-  const generateSummary = (msgs: ChatMessage[]): string => {
-    const userMessages = msgs.filter(m => m.role === 'user');
-    if (userMessages.length === 0) return '';
-
-    const themes: string[] = [];
-    const emotions = ['anxious', 'stressed', 'happy', 'sad', 'frustrated', 'grateful', 'overwhelmed', 'excited', 'worried', 'calm', 'angry', 'peaceful'];
-
-    userMessages.forEach(msg => {
-      const lowerContent = msg.content.toLowerCase();
-      emotions.forEach(emotion => {
-        if (lowerContent.includes(emotion) && !themes.includes(emotion)) {
-          themes.push(emotion);
-        }
-      });
-    });
-
-    if (themes.length > 0) {
-      return `Today you explored feelings of ${themes.slice(0, 3).join(', ')}. Your words reveal a journey through these emotions.`;
-    }
-
-    return `Today you took time to reflect and express yourself. Your thoughts are noted and valued.`;
-  };
-
-  const handleSend = async () => {
-    if (!input.trim() || !user || loading || !currentEntry) return;
-
-    const userMessage = input.trim();
-    setInput('');
-    setLoading(true);
-
-    const userMsg: ChatMessage = {
-      id: crypto.randomUUID(),
-      user_id: user.id,
-      session_id: currentEntry.id,
-      role: 'user',
-      content: userMessage,
-      reframed_content: null,
-      is_journal_entry: true,
-      created_at: new Date().toISOString(),
-    };
-
-    setMessages(prev => [...prev, userMsg]);
-
-    await supabase.from('chat_messages').insert({
-      user_id: user.id,
-      session_id: currentEntry.id,
-      role: 'user',
-      content: userMessage,
-      is_journal_entry: true,
-    });
-
-    setTimeout(async () => {
-      const responseContent = generateJournalResponse(userMessage, messages);
-
-      const assistantMsg: ChatMessage = {
-        id: crypto.randomUUID(),
-        user_id: user.id,
-        session_id: currentEntry.id,
-        role: 'assistant',
-        content: responseContent,
-        reframed_content: null,
-        is_journal_entry: true,
-        created_at: new Date().toISOString(),
-      };
-
-      setMessages(prev => [...prev, assistantMsg]);
-
-      await supabase.from('chat_messages').insert({
-        user_id: user.id,
-        session_id: currentEntry.id,
-        role: 'assistant',
-        content: responseContent,
-        is_journal_entry: true,
-      });
-
-      const allMessages = [...messages, userMsg, assistantMsg];
-      const summary = generateSummary(allMessages);
-
-      await supabase
-        .from('chat_sessions')
+    if (currentEntry) {
+      const { error } = await supabase
+        .from('journal_entries')
         .update({
+          content: content.trim(),
+          title: tempTitle || `Journal - ${new Date(selectedDate).toLocaleDateString()}`,
           updated_at: new Date().toISOString(),
-          summary: summary,
         })
         .eq('id', currentEntry.id);
 
-      setCurrentEntry(prev => prev ? { ...prev, summary } : null);
-
-      setLoading(false);
-    }, 800);
-  };
-
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
-  };
-
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-  };
-
-  const navigateDate = (direction: 'prev' | 'next') => {
-    const currentDate = new Date(selectedDate);
-    const newDate = new Date(currentDate);
-    newDate.setDate(currentDate.getDate() + (direction === 'next' ? 1 : -1));
-    const newDateStr = newDate.toISOString().split('T')[0];
-    setSelectedDate(newDateStr);
-
-    const entryForDate = entries.find(e => e.entry_date === newDateStr);
-    if (entryForDate) {
-      setCurrentEntry(entryForDate);
+      if (!error) {
+        setLastSaved(new Date());
+        await loadJournalEntries();
+      }
     } else {
-      setCurrentEntry(null);
-      setMessages([]);
+      const { data, error } = await supabase
+        .from('journal_entries')
+        .insert({
+          user_id: user.id,
+          entry_date: selectedDate,
+          content: content.trim(),
+          title: tempTitle || `Journal - ${new Date(selectedDate).toLocaleDateString()}`,
+        })
+        .select()
+        .single();
+
+      if (data && !error) {
+        setCurrentEntry(data);
+        setLastSaved(new Date());
+        await loadJournalEntries();
+      }
     }
+
+    setIsSaving(false);
+  };
+
+  const deleteEntry = async () => {
+    if (!currentEntry) return;
+
+    const { error } = await supabase
+      .from('journal_entries')
+      .delete()
+      .eq('id', currentEntry.id);
+
+    if (!error) {
+      setEntries(prev => prev.filter(e => e.id !== currentEntry.id));
+      setCurrentEntry(null);
+      setContent('');
+      setShowDeleteConfirm(false);
+    }
+  };
+
+  const updateEntryTitle = async () => {
+    if (!currentEntry || !tempTitle.trim()) {
+      setEditingTitle(false);
+      return;
+    }
+
+    const { error } = await supabase
+      .from('journal_entries')
+      .update({ title: tempTitle.trim() })
+      .eq('id', currentEntry.id);
+
+    if (!error) {
+      setEditingTitle(false);
+      await loadJournalEntries();
+    }
+  };
+
+  const changeDate = (direction: 'prev' | 'next') => {
+    const currentDate = new Date(selectedDate);
+    if (direction === 'prev') {
+      currentDate.setDate(currentDate.getDate() - 1);
+    } else {
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+    setSelectedDate(currentDate.toISOString().split('T')[0]);
   };
 
   const startRecording = async () => {
@@ -331,7 +171,7 @@ export function Journal({ onOpenSettings }: JournalProps = {}) {
       recognition.interimResults = true;
       recognition.lang = 'en-US';
 
-      const startingText = input;
+      const startingText = content;
       recordedTextRef.current = '';
 
       recognition.onresult = (event: any) => {
@@ -352,7 +192,7 @@ export function Journal({ onOpenSettings }: JournalProps = {}) {
         }
 
         const displayText = recordedTextRef.current + interimTranscript;
-        setInput(startingText + (startingText ? ' ' : '') + displayText);
+        setContent(startingText + (startingText ? ' ' : '') + displayText);
       };
 
       recognition.onerror = (event: any) => {
@@ -381,294 +221,189 @@ export function Journal({ onOpenSettings }: JournalProps = {}) {
     }
   };
 
-  const updateEntryTitle = async () => {
-    if (!currentEntry || !tempTitle.trim()) {
-      setEditingTitle(false);
-      return;
-    }
-
-    await supabase
-      .from('chat_sessions')
-      .update({ title: tempTitle.trim() })
-      .eq('id', currentEntry.id);
-
-    setCurrentEntry(prev => prev ? { ...prev, title: tempTitle.trim() } : null);
-    setEntries(prev => prev.map(e => e.id === currentEntry.id ? { ...e, title: tempTitle.trim() } : e));
-    setEditingTitle(false);
-  };
-
-  const deleteEntry = async () => {
-    if (!currentEntry) return;
-
-    await supabase
-      .from('chat_messages')
-      .delete()
-      .eq('session_id', currentEntry.id);
-
-    await supabase
-      .from('chat_sessions')
-      .delete()
-      .eq('id', currentEntry.id);
-
-    setEntries(prev => prev.filter(e => e.id !== currentEntry.id));
-    setCurrentEntry(null);
-    setMessages([]);
-    setShowDeleteConfirm(false);
-  };
-
   return (
-    <div className="flex h-full bg-gradient-to-br from-blue-50 via-sky-50 to-indigo-50">
-      <div className="flex-1 flex items-center justify-center p-8">
-        <div className="relative w-full max-w-4xl h-full">
-          <div className="absolute inset-0 bg-gradient-to-br from-blue-100 to-sky-100 rounded-3xl shadow-2xl transform rotate-1"></div>
-          <div className="absolute inset-0 bg-white rounded-3xl shadow-2xl border-4 border-blue-200" style={{
-            backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 31px, #e5e7eb 31px, #e5e7eb 32px)',
-          }}>
-            <div className="h-full flex flex-col p-8">
-              <div className="mb-6 pb-4 border-b-2 border-blue-300">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-3">
-                    <BookOpen className="w-8 h-8 text-blue-700" />
-                    <div>
-                      <h1 className="text-2xl font-bold text-blue-900" style={{ fontFamily: 'Georgia, serif' }}>
-                        My Journal
-                      </h1>
-                      <div className="flex items-center gap-2 mt-1">
-                        <button
-                          onClick={() => navigateDate('prev')}
-                          className="p-1 hover:bg-blue-100 rounded transition-all"
-                        >
-                          <ChevronLeft className="w-4 h-4 text-blue-700" />
-                        </button>
-                        <p className="text-sm text-blue-700">{formatDate(selectedDate)}</p>
-                        <button
-                          onClick={() => navigateDate('next')}
-                          className="p-1 hover:bg-blue-100 rounded transition-all"
-                          disabled={selectedDate === new Date().toISOString().split('T')[0]}
-                        >
-                          <ChevronRight className="w-4 h-4 text-blue-700" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {onOpenSettings && (
-                      <button
-                        onClick={onOpenSettings}
-                        className="p-2 hover:bg-blue-100 text-blue-600 rounded-lg transition-all active:scale-95"
-                        title="Settings"
-                      >
-                        <Settings className="w-5 h-5" />
-                      </button>
-                    )}
-                    {currentEntry && (
-                      <button
-                        onClick={() => setShowDeleteConfirm(true)}
-                        className="p-2 hover:bg-red-100 text-red-600 rounded-lg transition-all active:scale-95"
-                        title="Delete entry"
-                      >
-                        <Trash2 className="w-5 h-5" />
-                      </button>
-                    )}
-                    {!currentEntry && (
-                      <button
-                        onClick={createNewEntry}
-                        className="px-4 py-2 bg-gradient-to-r from-blue-500 to-sky-500 text-white rounded-xl hover:shadow-lg transition-all active:scale-95 text-sm font-medium"
-                      >
-                        Start Writing
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {currentEntry && !editingTitle && (
-                  <div className="flex items-center gap-2 mt-2">
-                    <h2 className="text-lg font-semibold text-blue-800" style={{ fontFamily: 'Georgia, serif' }}>
-                      {currentEntry.title}
-                    </h2>
-                    <button
-                      onClick={() => {
-                        setEditingTitle(true);
-                        setTempTitle(currentEntry.title);
-                      }}
-                      className="p-1 hover:bg-blue-100 rounded transition-all"
-                    >
-                      <Edit3 className="w-4 h-4 text-blue-600" />
-                    </button>
-                  </div>
+    <div className="flex h-full bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
+      <div className="flex-1 flex flex-col max-w-5xl mx-auto w-full">
+        <div className="bg-white/80 backdrop-blur-sm shadow-lg border-b border-gray-200">
+          <div className="p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <BookOpen className="w-8 h-8 text-blue-600" />
+                <h1 className="text-2xl font-semibold text-gray-900">My Journal</h1>
+              </div>
+              <div className="flex items-center gap-2">
+                {onOpenSettings && (
+                  <button
+                    onClick={onOpenSettings}
+                    className="p-2 hover:bg-blue-100 text-blue-600 rounded-lg transition-all active:scale-95"
+                    title="Settings"
+                  >
+                    <Settings className="w-5 h-5" />
+                  </button>
                 )}
+                {currentEntry && (
+                  <>
+                    <button
+                      onClick={() => saveEntry()}
+                      disabled={isSaving}
+                      className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all active:scale-95 disabled:opacity-50"
+                    >
+                      <Save className="w-4 h-4" />
+                      {isSaving ? 'Saving...' : 'Save'}
+                    </button>
+                    <button
+                      onClick={() => setShowDeleteConfirm(true)}
+                      className="p-2 hover:bg-red-100 text-red-600 rounded-lg transition-all active:scale-95"
+                      title="Delete Entry"
+                    >
+                      <Trash2 className="w-5 h-5" />
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
 
-                {editingTitle && (
-                  <div className="flex items-center gap-2 mt-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => changeDate('prev')}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-all"
+                  title="Previous Day"
+                >
+                  <ChevronLeft className="w-5 h-5 text-gray-600" />
+                </button>
+                <div className="flex items-center gap-2 px-4 py-2 bg-blue-100 rounded-lg">
+                  <Calendar className="w-4 h-4 text-blue-600" />
+                  <input
+                    type="date"
+                    value={selectedDate}
+                    onChange={(e) => setSelectedDate(e.target.value)}
+                    max={new Date().toISOString().split('T')[0]}
+                    className="bg-transparent text-gray-900 font-medium outline-none cursor-pointer"
+                  />
+                </div>
+                <button
+                  onClick={() => changeDate('next')}
+                  disabled={selectedDate === new Date().toISOString().split('T')[0]}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Next Day"
+                >
+                  <ChevronRight className="w-5 h-5 text-gray-600" />
+                </button>
+              </div>
+
+              {lastSaved && (
+                <span className="text-xs text-gray-500">
+                  Last saved: {lastSaved.toLocaleTimeString()}
+                </span>
+              )}
+            </div>
+
+            {currentEntry && (
+              <div className="mt-4 flex items-center gap-2">
+                {editingTitle ? (
+                  <>
                     <input
                       type="text"
                       value={tempTitle}
                       onChange={(e) => setTempTitle(e.target.value)}
-                      className="flex-1 px-3 py-1 border-2 border-blue-300 rounded-lg focus:outline-none focus:border-blue-500"
-                      style={{ fontFamily: 'Georgia, serif' }}
+                      className="flex-1 px-3 py-1 border border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Entry title"
                       autoFocus
-                      onKeyPress={(e) => {
-                        if (e.key === 'Enter') updateEntryTitle();
-                        if (e.key === 'Escape') setEditingTitle(false);
-                      }}
                     />
                     <button
                       onClick={updateEntryTitle}
                       className="p-1 hover:bg-green-100 text-green-600 rounded transition-all"
                     >
-                      <Check className="w-4 h-4" />
+                      <Check className="w-5 h-5" />
                     </button>
                     <button
-                      onClick={() => setEditingTitle(false)}
+                      onClick={() => {
+                        setEditingTitle(false);
+                        setTempTitle(currentEntry.title);
+                      }}
                       className="p-1 hover:bg-red-100 text-red-600 rounded transition-all"
                     >
-                      <X className="w-4 h-4" />
+                      <X className="w-5 h-5" />
                     </button>
-                  </div>
-                )}
-              </div>
-
-              <div className="flex-1 overflow-y-auto mb-6 space-y-6 pr-2" style={{ scrollbarWidth: 'thin' }}>
-                {messages.length === 0 ? (
-                  <div className="text-center py-16">
-                    <BookOpen className="w-16 h-16 text-blue-300 mx-auto mb-4" />
-                    <p className="text-blue-600 italic" style={{ fontFamily: 'Georgia, serif' }}>
-                      {currentEntry ? 'Begin your entry...' : 'No entry for this day yet'}
-                    </p>
-                  </div>
+                  </>
                 ) : (
                   <>
-                    {messages.map((message, index) => (
-                      <div
-                        key={message.id}
-                        className={`${message.role === 'user' ? 'ml-8' : 'mr-8'}`}
-                      >
-                        <p
-                          className={`leading-relaxed ${
-                            message.role === 'user'
-                              ? 'text-gray-900'
-                              : 'text-blue-700 text-sm italic'
-                          }`}
-                          style={{
-                            fontFamily: message.role === 'user' ? "'Kalam', 'Patrick Hand', 'Comic Sans MS', cursive" : 'Georgia, serif',
-                            fontSize: message.role === 'user' ? '1.125rem' : '0.875rem',
-                            lineHeight: message.role === 'user' ? '2.25rem' : '1.75rem',
-                            letterSpacing: message.role === 'user' ? '0.01em' : 'normal',
-                          }}
-                        >
-                          {message.content}
-                        </p>
-                      </div>
-                    ))}
-
-                    {currentEntry?.summary && messages.filter(m => m.role === 'user').length >= 3 && (
-                      <div className="mt-8 pt-6 border-t-2 border-blue-200">
-                        <p className="text-xs uppercase tracking-wider text-blue-600 mb-2">Daily Reflection</p>
-                        <p
-                          className="text-blue-900 italic leading-relaxed"
-                          style={{
-                            fontFamily: 'Brush Script MT, cursive',
-                            fontSize: '1.1rem',
-                          }}
-                        >
-                          {currentEntry.summary}
-                        </p>
-                      </div>
-                    )}
+                    <h2 className="text-lg font-medium text-gray-800">{currentEntry.title}</h2>
+                    <button
+                      onClick={() => setEditingTitle(true)}
+                      className="p-1 hover:bg-gray-100 text-gray-500 rounded transition-all"
+                    >
+                      <Edit3 className="w-4 h-4" />
+                    </button>
                   </>
                 )}
-                <div ref={messagesEndRef} />
               </div>
-
-              {currentEntry && (
-                <div className="flex gap-2">
-                  <button
-                    onClick={isRecording ? stopRecording : startRecording}
-                    className={`px-4 py-3 rounded-xl hover:shadow-lg transition-all active:scale-95 ${
-                      isRecording
-                        ? 'bg-red-500 text-white animate-pulse'
-                        : 'bg-blue-200 text-blue-700 hover:bg-blue-300'
-                    }`}
-                    title={isRecording ? 'Stop recording' : 'Start voice recording'}
-                  >
-                    {isRecording ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
-                  </button>
-                  <textarea
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    onKeyPress={handleKeyPress}
-                    placeholder="Write your thoughts..."
-                    className="flex-1 px-4 py-3 border-2 border-blue-300 rounded-xl focus:outline-none focus:border-blue-500 resize-none bg-blue-50/50"
-                    style={{
-                      fontFamily: 'Georgia, serif',
-                      lineHeight: '1.5rem',
-                    }}
-                    rows={2}
-                    disabled={loading}
-                  />
-                  <button
-                    onClick={handleSend}
-                    disabled={!input.trim() || loading}
-                    className="px-6 py-3 bg-gradient-to-r from-blue-500 to-sky-500 text-white rounded-xl hover:shadow-lg transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <Send className="w-5 h-5" />
-                  </button>
-                </div>
-              )}
-            </div>
+            )}
           </div>
         </div>
-      </div>
 
-      <div className="w-64 bg-blue-100/50 border-l border-blue-200 p-4 overflow-y-auto">
-        <div className="flex items-center gap-2 mb-4 pb-3 border-b border-blue-300">
-          <Calendar className="w-5 h-5 text-blue-700" />
-          <h3 className="font-semibold text-blue-900">Past Entries</h3>
-        </div>
-        <div className="space-y-2">
-          {entries.map((entry) => (
-            <button
-              key={entry.id}
-              onClick={() => {
-                setCurrentEntry(entry);
-                setSelectedDate(entry.entry_date || new Date().toISOString().split('T')[0]);
+        <div className="flex-1 p-6 overflow-y-auto">
+          <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg p-8 min-h-full">
+            <textarea
+              ref={textAreaRef}
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              placeholder={`What's on your mind today, ${new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}?`}
+              className="w-full h-full min-h-[500px] p-4 bg-transparent border-none outline-none resize-none text-gray-900"
+              style={{
+                fontFamily: "'Kalam', 'Patrick Hand', 'Comic Sans MS', cursive",
+                fontSize: '1.125rem',
+                lineHeight: '2.25rem',
+                letterSpacing: '0.01em',
               }}
-              className={`w-full text-left p-3 rounded-xl transition-all ${
-                currentEntry?.id === entry.id
-                  ? 'bg-blue-200 border-2 border-blue-400'
-                  : 'bg-white hover:bg-blue-50 border border-blue-200'
+            />
+          </div>
+        </div>
+
+        <div className="bg-white/80 backdrop-blur-sm border-t border-gray-200 p-4">
+          <div className="flex items-center justify-center gap-4">
+            <button
+              onClick={isRecording ? stopRecording : startRecording}
+              className={`flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-all active:scale-95 ${
+                isRecording
+                  ? 'bg-red-500 hover:bg-red-600 text-white animate-pulse'
+                  : 'bg-blue-600 hover:bg-blue-700 text-white'
               }`}
             >
-              <p className="text-xs text-blue-600 mb-1">
-                {entry.entry_date ? formatDate(entry.entry_date) : 'Unknown date'}
-              </p>
-              {entry.summary && (
-                <p className="text-xs text-gray-600 italic line-clamp-2">{entry.summary}</p>
+              {isRecording ? (
+                <>
+                  <MicOff className="w-5 h-5" />
+                  <span>Stop Recording</span>
+                </>
+              ) : (
+                <>
+                  <Mic className="w-5 h-5" />
+                  <span>Start Recording</span>
+                </>
               )}
             </button>
-          ))}
+          </div>
         </div>
       </div>
 
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl p-6 max-w-md shadow-2xl">
-            <h3 className="text-xl font-bold text-gray-900 mb-3" style={{ fontFamily: 'Georgia, serif' }}>
-              Delete Entry?
-            </h3>
+          <div className="bg-white rounded-2xl p-6 max-w-md mx-4 shadow-2xl">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Delete Journal Entry?</h3>
             <p className="text-gray-600 mb-6">
-              Are you sure you want to delete this journal entry? This action cannot be undone.
+              This will permanently delete this journal entry. This action cannot be undone.
             </p>
-            <div className="flex gap-3 justify-end">
+            <div className="flex gap-3">
               <button
                 onClick={() => setShowDeleteConfirm(false)}
-                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-all"
+                className="flex-1 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-all"
               >
                 Cancel
               </button>
               <button
                 onClick={deleteEntry}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all"
+                className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-all"
               >
                 Delete
               </button>
