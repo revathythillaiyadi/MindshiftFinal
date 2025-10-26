@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { BookOpen, Send, ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
+import { BookOpen, Send, ChevronLeft, ChevronRight, Calendar, Mic, MicOff, Trash2, Edit3, Check, X } from 'lucide-react';
 import { supabase, ChatMessage, ChatSession } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -30,7 +30,13 @@ export function Journal() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [isRecording, setIsRecording] = useState(false);
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [tempTitle, setTempTitle] = useState('');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
   const { user } = useAuth();
 
   useEffect(() => {
@@ -300,6 +306,92 @@ export function Journal() {
     }
   };
 
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        await transcribeAudio(audioBlob);
+        stream.getTracks().forEach(track => track.stop());
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+    } catch (error) {
+      console.error('Error accessing microphone:', error);
+      alert('Could not access microphone. Please check your permissions.');
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+    }
+  };
+
+  const transcribeAudio = async (audioBlob: Blob) => {
+    setLoading(true);
+    try {
+      const reader = new FileReader();
+      reader.readAsDataURL(audioBlob);
+      reader.onloadend = () => {
+        const base64Audio = reader.result as string;
+        const transcribedText = '[Voice note recorded - transcription would happen here]';
+        setInput(prev => prev + (prev ? ' ' : '') + transcribedText);
+        setLoading(false);
+      };
+    } catch (error) {
+      console.error('Error transcribing audio:', error);
+      setLoading(false);
+    }
+  };
+
+  const updateEntryTitle = async () => {
+    if (!currentEntry || !tempTitle.trim()) {
+      setEditingTitle(false);
+      return;
+    }
+
+    await supabase
+      .from('chat_sessions')
+      .update({ title: tempTitle.trim() })
+      .eq('id', currentEntry.id);
+
+    setCurrentEntry(prev => prev ? { ...prev, title: tempTitle.trim() } : null);
+    setEntries(prev => prev.map(e => e.id === currentEntry.id ? { ...e, title: tempTitle.trim() } : e));
+    setEditingTitle(false);
+  };
+
+  const deleteEntry = async () => {
+    if (!currentEntry) return;
+
+    await supabase
+      .from('chat_messages')
+      .delete()
+      .eq('session_id', currentEntry.id);
+
+    await supabase
+      .from('chat_sessions')
+      .delete()
+      .eq('id', currentEntry.id);
+
+    setEntries(prev => prev.filter(e => e.id !== currentEntry.id));
+    setCurrentEntry(null);
+    setMessages([]);
+    setShowDeleteConfirm(false);
+  };
+
   return (
     <div className="flex h-full bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50">
       <div className="flex-1 flex items-center justify-center p-8">
@@ -309,38 +401,97 @@ export function Journal() {
             backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 31px, #e5e7eb 31px, #e5e7eb 32px)',
           }}>
             <div className="h-full flex flex-col p-8">
-              <div className="flex items-center justify-between mb-6 pb-4 border-b-2 border-amber-300">
-                <div className="flex items-center gap-3">
-                  <BookOpen className="w-8 h-8 text-amber-700" />
-                  <div>
-                    <h1 className="text-2xl font-bold text-amber-900" style={{ fontFamily: 'Georgia, serif' }}>
-                      My Journal
-                    </h1>
-                    <div className="flex items-center gap-2 mt-1">
-                      <button
-                        onClick={() => navigateDate('prev')}
-                        className="p-1 hover:bg-amber-100 rounded transition-all"
-                      >
-                        <ChevronLeft className="w-4 h-4 text-amber-700" />
-                      </button>
-                      <p className="text-sm text-amber-700">{formatDate(selectedDate)}</p>
-                      <button
-                        onClick={() => navigateDate('next')}
-                        className="p-1 hover:bg-amber-100 rounded transition-all"
-                        disabled={selectedDate === new Date().toISOString().split('T')[0]}
-                      >
-                        <ChevronRight className="w-4 h-4 text-amber-700" />
-                      </button>
+              <div className="mb-6 pb-4 border-b-2 border-amber-300">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <BookOpen className="w-8 h-8 text-amber-700" />
+                    <div>
+                      <h1 className="text-2xl font-bold text-amber-900" style={{ fontFamily: 'Georgia, serif' }}>
+                        My Journal
+                      </h1>
+                      <div className="flex items-center gap-2 mt-1">
+                        <button
+                          onClick={() => navigateDate('prev')}
+                          className="p-1 hover:bg-amber-100 rounded transition-all"
+                        >
+                          <ChevronLeft className="w-4 h-4 text-amber-700" />
+                        </button>
+                        <p className="text-sm text-amber-700">{formatDate(selectedDate)}</p>
+                        <button
+                          onClick={() => navigateDate('next')}
+                          className="p-1 hover:bg-amber-100 rounded transition-all"
+                          disabled={selectedDate === new Date().toISOString().split('T')[0]}
+                        >
+                          <ChevronRight className="w-4 h-4 text-amber-700" />
+                        </button>
+                      </div>
                     </div>
                   </div>
+                  <div className="flex items-center gap-2">
+                    {currentEntry && (
+                      <button
+                        onClick={() => setShowDeleteConfirm(true)}
+                        className="p-2 hover:bg-red-100 text-red-600 rounded-lg transition-all active:scale-95"
+                        title="Delete entry"
+                      >
+                        <Trash2 className="w-5 h-5" />
+                      </button>
+                    )}
+                    {!currentEntry && (
+                      <button
+                        onClick={createNewEntry}
+                        className="px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-xl hover:shadow-lg transition-all active:scale-95 text-sm font-medium"
+                      >
+                        Start Writing
+                      </button>
+                    )}
+                  </div>
                 </div>
-                {!currentEntry && (
-                  <button
-                    onClick={createNewEntry}
-                    className="px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-xl hover:shadow-lg transition-all active:scale-95 text-sm font-medium"
-                  >
-                    Start Writing
-                  </button>
+
+                {currentEntry && !editingTitle && (
+                  <div className="flex items-center gap-2 mt-2">
+                    <h2 className="text-lg font-semibold text-amber-800" style={{ fontFamily: 'Georgia, serif' }}>
+                      {currentEntry.title}
+                    </h2>
+                    <button
+                      onClick={() => {
+                        setEditingTitle(true);
+                        setTempTitle(currentEntry.title);
+                      }}
+                      className="p-1 hover:bg-amber-100 rounded transition-all"
+                    >
+                      <Edit3 className="w-4 h-4 text-amber-600" />
+                    </button>
+                  </div>
+                )}
+
+                {editingTitle && (
+                  <div className="flex items-center gap-2 mt-2">
+                    <input
+                      type="text"
+                      value={tempTitle}
+                      onChange={(e) => setTempTitle(e.target.value)}
+                      className="flex-1 px-3 py-1 border-2 border-amber-300 rounded-lg focus:outline-none focus:border-amber-500"
+                      style={{ fontFamily: 'Georgia, serif' }}
+                      autoFocus
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter') updateEntryTitle();
+                        if (e.key === 'Escape') setEditingTitle(false);
+                      }}
+                    />
+                    <button
+                      onClick={updateEntryTitle}
+                      className="p-1 hover:bg-green-100 text-green-600 rounded transition-all"
+                    >
+                      <Check className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => setEditingTitle(false)}
+                      className="p-1 hover:bg-red-100 text-red-600 rounded transition-all"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
                 )}
               </div>
 
@@ -396,6 +547,17 @@ export function Journal() {
 
               {currentEntry && (
                 <div className="flex gap-2">
+                  <button
+                    onClick={isRecording ? stopRecording : startRecording}
+                    className={`px-4 py-3 rounded-xl hover:shadow-lg transition-all active:scale-95 ${
+                      isRecording
+                        ? 'bg-red-500 text-white animate-pulse'
+                        : 'bg-amber-200 text-amber-700 hover:bg-amber-300'
+                    }`}
+                    title={isRecording ? 'Stop recording' : 'Start voice recording'}
+                  >
+                    {isRecording ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+                  </button>
                   <textarea
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
@@ -452,6 +614,33 @@ export function Journal() {
           ))}
         </div>
       </div>
+
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-6 max-w-md shadow-2xl">
+            <h3 className="text-xl font-bold text-gray-900 mb-3" style={{ fontFamily: 'Georgia, serif' }}>
+              Delete Entry?
+            </h3>
+            <p className="text-gray-600 mb-6">
+              Are you sure you want to delete this journal entry? This action cannot be undone.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={deleteEntry}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
