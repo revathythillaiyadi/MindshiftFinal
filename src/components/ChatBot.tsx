@@ -317,32 +317,33 @@ export function ChatBot() {
   };
 
   const makeChildlike = (text: string): string => {
-    const childlikeReplacements: { [key: string]: string } = {
-      'difficult': 'hard',
-      'challenging': 'tough',
-      'understand': 'get it',
-      'wonderful': 'super cool',
-      'excellent': 'awesome',
-      'however': 'but',
-      'therefore': 'so',
-      'perhaps': 'maybe',
-      'certainly': 'for sure',
-      'absolutely': 'totally',
-      'remember': 'member',
-      'because': 'cause',
-      'going to': 'gonna',
-      'want to': 'wanna',
-    };
-
     let childText = text;
-    Object.entries(childlikeReplacements).forEach(([formal, casual]) => {
-      const regex = new RegExp(`\\b${formal}\\b`, 'gi');
-      childText = childText.replace(regex, casual);
-    });
 
-    childText = childText.replace(/\./g, '! ');
-    childText = childText.replace(/very /gi, 'super ');
-    childText = childText.replace(/really /gi, 'super duper ');
+    const fillerPhrases = ['um', 'uh', 'like', 'you know', 'so'];
+    const sentences = childText.split(/(?<=[.!?])\s+/);
+
+    childText = sentences.map((sentence, index) => {
+      if (sentence.length > 30) {
+        const words = sentence.split(' ');
+        const insertPoints = [Math.floor(words.length * 0.3), Math.floor(words.length * 0.6)];
+
+        insertPoints.forEach((point, i) => {
+          if (point < words.length) {
+            words.splice(point + i, 0, fillerPhrases[Math.floor(Math.random() * fillerPhrases.length)] + ',');
+          }
+        });
+
+        return words.join(' ');
+      }
+      return sentence;
+    }).join(' ');
+
+    childText = childText.replace(/\bvery\b/gi, 'really really');
+    childText = childText.replace(/\bimportant\b/gi, 'super important');
+
+    if (Math.random() > 0.5) {
+      childText = 'So, ' + childText;
+    }
 
     return childText;
   };
@@ -363,8 +364,8 @@ export function ChatBot() {
           utterance.pitch = 0.95;
         } else if (voice.name.toLowerCase().includes('child') || voice.name.toLowerCase().includes('junior') || voice.name.toLowerCase().includes('alex')) {
           spokenText = makeChildlike(text);
-          utterance.rate = 1.1;
-          utterance.pitch = 1.5;
+          utterance.rate = 1.15;
+          utterance.pitch = 1.6;
         } else {
           utterance.rate = 0.85;
           utterance.pitch = 1.05;
