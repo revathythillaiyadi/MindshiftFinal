@@ -63,6 +63,7 @@ const voiceOptions: VoiceOption[] = [
 ];
 
 export function ChatBot() {
+  const [currentView, setCurrentView] = useState<'mode-select' | 'chat' | 'journal'>('mode-select');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
@@ -864,8 +865,58 @@ Can you tell me one thing you need me to know about your feelings right now?`;
     '👍', '👏', '🤝', '💯', '✅', '⭐', '🏆', '🎯'
   ];
 
-  if (journalMode === 'journal' && !showSettings) {
-    return <Journal onOpenSettings={() => setShowSettings(true)} />;
+  if (currentView === 'journal') {
+    return <Journal onOpenSettings={() => {
+      setCurrentView('mode-select');
+      setShowSettings(true);
+    }} />;
+  }
+
+  if (currentView === 'mode-select' && sessions.length === 0) {
+    return (
+      <div className="flex h-full bg-white rounded-3xl shadow-lg border border-gray-100 overflow-hidden">
+        <div className="flex-1 flex flex-col items-center justify-center p-8">
+          <h2 className="text-3xl font-bold text-gray-800 mb-4">Chat Mode</h2>
+          <p className="text-gray-600 mb-8 text-center max-w-md">Select Your Mode</p>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-3xl">
+            <button
+              onClick={() => {
+                setJournalMode('reframe');
+                setCurrentView('chat');
+                createNewSession('reframe');
+              }}
+              className="group p-8 rounded-2xl border-4 border-purple-200 bg-gradient-to-br from-pink-50 to-purple-50 hover:border-purple-400 hover:shadow-xl transition-all transform hover:-translate-y-1"
+            >
+              <Brain className="w-16 h-16 text-purple-600 mx-auto mb-4" />
+              <h3 className="text-2xl font-bold text-gray-800 mb-2">Reframe Mode</h3>
+              <p className="text-gray-600">Get help reframing negative thoughts</p>
+            </button>
+
+            <button
+              onClick={() => {
+                setJournalMode('journal');
+                setCurrentView('journal');
+              }}
+              className="group p-8 rounded-2xl border-4 border-gray-200 bg-white hover:border-blue-300 hover:shadow-xl transition-all transform hover:-translate-y-1"
+            >
+              <BookOpen className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-2xl font-bold text-gray-800 mb-2">Journal Mode</h3>
+              <p className="text-gray-600">Express freely without suggestions</p>
+            </button>
+          </div>
+
+          <div className="mt-8 p-4 bg-blue-50 border-2 border-blue-200 rounded-2xl max-w-3xl">
+            <p className="text-sm text-blue-800 text-center">
+              <span className="font-semibold">Current: </span>
+              {journalMode === 'journal'
+                ? 'Journal Mode - A safe space for reflective writing'
+                : 'Reframe Mode - Cognitive reframing assistance'}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -882,8 +933,11 @@ Can you tell me one thing you need me to know about your feelings right now?`;
                 <span>Reframe Mode</span>
               </button>
               <button
-                onClick={() => createNewSession('journal')}
-                className="w-full flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 text-white rounded-xl hover:shadow-lg transition-all active:scale-95 text-sm font-medium"
+                onClick={() => {
+                  setJournalMode('journal');
+                  setCurrentView('journal');
+                }}
+                className="w-full flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-xl hover:shadow-lg transition-all active:scale-95 text-sm font-medium"
               >
                 <BookOpen className="w-4 h-4" />
                 <span>Journal Mode</span>
@@ -1010,22 +1064,17 @@ Can you tell me one thing you need me to know about your feelings right now?`;
                       </button>
                       <button
                         onClick={() => {
-                          if (currentSessionId) {
-                            const session = sessions.find(s => s.id === currentSessionId);
-                            if (session?.journal_mode !== 'journal') {
-                              createNewSession('journal');
-                            }
-                          } else {
-                            createNewSession('journal');
-                          }
+                          setJournalMode('journal');
+                          setCurrentView('journal');
+                          setShowSettings(false);
                         }}
                         className={`p-4 rounded-xl border-2 transition-all ${
                           journalMode === 'journal'
-                            ? 'border-emerald-400 bg-gradient-to-br from-emerald-50 to-teal-50'
-                            : 'border-gray-200 bg-white hover:border-emerald-200'
+                            ? 'border-pink-400 bg-gradient-to-br from-pink-50 to-blue-50'
+                            : 'border-gray-200 bg-white hover:border-pink-200'
                         }`}
                       >
-                        <BookOpen className={`w-8 h-8 mx-auto mb-2 ${journalMode === 'journal' ? 'text-emerald-600' : 'text-gray-400'}`} />
+                        <BookOpen className={`w-8 h-8 mx-auto mb-2 ${journalMode === 'journal' ? 'text-pink-600' : 'text-gray-400'}`} />
                         <p className="font-semibold text-sm text-gray-800">Journal Mode</p>
                         <p className="text-xs text-gray-500 mt-1">Express freely without suggestions</p>
                       </button>

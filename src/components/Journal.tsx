@@ -277,12 +277,12 @@ export function Journal({ onOpenSettings }: JournalProps = {}) {
   };
 
   return (
-    <div className="flex h-full bg-gradient-to-br from-amber-50 via-orange-50 to-red-50">
+    <div className="flex h-full bg-gradient-to-br from-pink-50 via-blue-50 to-cyan-50">
       {showSidebar && (
         <div className="w-72 bg-white/90 backdrop-blur-sm border-r border-gray-200 flex flex-col shadow-lg">
           <div className="p-4 border-b border-gray-200 flex items-center justify-between">
             <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-              <BookOpen className="w-5 h-5 text-amber-600" />
+              <BookOpen className="w-5 h-5 text-pink-600" />
               My Journal
             </h2>
             <button
@@ -297,7 +297,7 @@ export function Journal({ onOpenSettings }: JournalProps = {}) {
           <div className="p-4 border-b border-gray-200">
             <button
               onClick={startNewEntry}
-              className="w-full px-4 py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-xl hover:shadow-lg transform hover:-translate-y-0.5 active:scale-95 transition-all font-medium flex items-center justify-center gap-2"
+              className="w-full px-4 py-3 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-xl hover:shadow-lg transform hover:-translate-y-0.5 active:scale-95 transition-all font-medium flex items-center justify-center gap-2"
             >
               <Plus className="w-5 h-5" />
               New Entry
@@ -315,7 +315,7 @@ export function Journal({ onOpenSettings }: JournalProps = {}) {
                     key={entry.id}
                     className={`group p-3 rounded-xl cursor-pointer transition-all ${
                       currentEntry?.id === entry.id
-                        ? 'bg-gradient-to-r from-amber-100 to-orange-100 border-2 border-amber-300'
+                        ? 'bg-gradient-to-r from-pink-100 to-blue-100 border-2 border-pink-300'
                         : 'hover:bg-gray-50 border border-gray-200'
                     }`}
                     onClick={() => viewEntry(entry)}
@@ -366,14 +366,14 @@ export function Journal({ onOpenSettings }: JournalProps = {}) {
         {viewMode === 'list' && (
           <div className="flex-1 flex items-center justify-center p-8">
             <div className="text-center max-w-md">
-              <BookOpen className="w-24 h-24 text-amber-500 mx-auto mb-6" />
+              <BookOpen className="w-24 h-24 text-pink-500 mx-auto mb-6" />
               <h2 className="text-3xl font-bold text-gray-800 mb-4">Welcome to Your Journal</h2>
               <p className="text-gray-600 mb-8">
                 Start documenting your thoughts, feelings, and experiences.
               </p>
               <button
                 onClick={startNewEntry}
-                className="px-8 py-4 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-2xl hover:shadow-lg transform hover:-translate-y-0.5 active:scale-95 transition-all font-medium text-lg flex items-center justify-center gap-2 mx-auto"
+                className="px-8 py-4 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-2xl hover:shadow-lg transform hover:-translate-y-0.5 active:scale-95 transition-all font-medium text-lg flex items-center justify-center gap-2 mx-auto"
               >
                 <Plus className="w-6 h-6" />
                 Create Your First Entry
@@ -384,14 +384,14 @@ export function Journal({ onOpenSettings }: JournalProps = {}) {
 
         {viewMode === 'new' && (
           <div className="flex-1 overflow-y-auto p-8">
-            <div className="max-w-4xl mx-auto bg-white rounded-2xl shadow-xl border-2 border-amber-200 p-8">
+            <div className="max-w-4xl mx-auto bg-white rounded-2xl shadow-xl border-2 border-pink-200 p-8">
               <div className="mb-6">
                 <input
                   type="text"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="Entry Title (optional - defaults to date/time)"
-                  className="w-full px-4 py-3 text-2xl font-bold border-b-2 border-gray-200 focus:border-amber-500 focus:outline-none transition-all"
+                  className="w-full px-4 py-3 text-2xl font-bold border-b-2 border-gray-200 focus:border-pink-500 focus:outline-none transition-all"
                 />
               </div>
 
@@ -403,7 +403,7 @@ export function Journal({ onOpenSettings }: JournalProps = {}) {
                     className={`px-6 py-3 rounded-xl font-medium flex items-center gap-2 transition-all ${
                       isRecording
                         ? 'bg-red-500 text-white animate-pulse'
-                        : 'bg-amber-500 text-white hover:bg-amber-600'
+                        : 'bg-pink-500 text-white hover:bg-pink-600'
                     }`}
                   >
                     {isRecording ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
@@ -432,7 +432,7 @@ export function Journal({ onOpenSettings }: JournalProps = {}) {
                   value={rawTextContent}
                   onChange={(e) => setRawTextContent(e.target.value)}
                   placeholder="Start typing or use voice recording..."
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-amber-500 focus:outline-none transition-all min-h-96 resize-none text-lg"
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-pink-500 focus:outline-none transition-all min-h-96 resize-none text-lg"
                   disabled={isRecording}
                 />
               </div>
@@ -460,14 +460,14 @@ export function Journal({ onOpenSettings }: JournalProps = {}) {
         {viewMode === 'view' && currentEntry && (
           <div className="flex-1 overflow-y-auto p-8">
             <div
-              className="max-w-4xl mx-auto bg-gradient-to-br from-amber-50 to-orange-50 rounded-2xl shadow-2xl border-4 border-amber-300 p-12 relative"
+              className="max-w-4xl mx-auto bg-gradient-to-br from-pink-50 to-blue-50 rounded-2xl shadow-2xl border-4 border-pink-300 p-12 relative"
               style={{
                 backgroundImage: `repeating-linear-gradient(transparent, transparent 31px, #e5e7eb 31px, #e5e7eb 32px)`,
                 lineHeight: '32px'
               }}
             >
               <div className="absolute top-0 left-0 w-full h-full pointer-events-none">
-                <div className="absolute left-12 top-0 bottom-0 w-0.5 bg-red-300"></div>
+                <div className="absolute left-12 top-0 bottom-0 w-0.5 bg-pink-300"></div>
               </div>
 
               <div className="relative">
@@ -483,7 +483,7 @@ export function Journal({ onOpenSettings }: JournalProps = {}) {
                           setEditingTitle(false);
                         }
                       }}
-                      className="w-full px-4 py-2 text-3xl font-bold border-2 border-amber-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-600"
+                      className="w-full px-4 py-2 text-3xl font-bold border-2 border-pink-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-600"
                       style={{ fontFamily: "'Caveat', cursive" }}
                       autoFocus
                     />
@@ -515,10 +515,10 @@ export function Journal({ onOpenSettings }: JournalProps = {}) {
                     </h1>
                     <button
                       onClick={() => setEditingTitle(true)}
-                      className="p-2 hover:bg-amber-200 rounded-lg transition-all"
+                      className="p-2 hover:bg-pink-200 rounded-lg transition-all"
                       title="Edit Title"
                     >
-                      <Edit3 className="w-5 h-5 text-amber-700" />
+                      <Edit3 className="w-5 h-5 text-pink-700" />
                     </button>
                   </div>
                 )}
@@ -536,7 +536,7 @@ export function Journal({ onOpenSettings }: JournalProps = {}) {
                   <div className="mb-8">
                     <textarea
                       defaultValue={currentEntry.raw_text_content || currentEntry.content || ''}
-                      className="w-full px-4 py-3 text-xl border-2 border-amber-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-600 min-h-96"
+                      className="w-full px-4 py-3 text-xl border-2 border-pink-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-600 min-h-96"
                       style={{ fontFamily: "'Caveat', cursive" }}
                       autoFocus
                     />
@@ -568,18 +568,18 @@ export function Journal({ onOpenSettings }: JournalProps = {}) {
                     </p>
                     <button
                       onClick={() => setEditingContent(true)}
-                      className="absolute -right-2 -top-2 p-2 bg-white hover:bg-amber-200 rounded-lg shadow-lg transition-all opacity-0 group-hover:opacity-100"
+                      className="absolute -right-2 -top-2 p-2 bg-white hover:bg-pink-200 rounded-lg shadow-lg transition-all opacity-0 group-hover:opacity-100"
                       title="Edit Content"
                     >
-                      <Edit3 className="w-5 h-5 text-amber-700" />
+                      <Edit3 className="w-5 h-5 text-pink-700" />
                     </button>
                   </div>
                 )}
 
-                <div className="flex gap-4 pt-6 border-t border-amber-300">
+                <div className="flex gap-4 pt-6 border-t border-pink-300">
                   <button
                     onClick={() => setViewMode('list')}
-                    className="px-6 py-3 bg-amber-500 text-white rounded-xl hover:bg-amber-600 transition-all font-medium"
+                    className="px-6 py-3 bg-pink-500 text-white rounded-xl hover:bg-pink-600 transition-all font-medium"
                   >
                     Back to List
                   </button>
