@@ -1266,6 +1266,14 @@ export function ChatBot() {
                     <h2 className="text-xl font-semibold text-white">
                       {journalMode === 'journal' ? 'Journal Mode' : 'Mindshift Assistant'}
                     </h2>
+                    {currentSessionId && sessions.find(s => s.id === currentSessionId) && (
+                      <p className="text-sm font-medium text-white/90 mb-1">
+                        {sessions.find(s => s.id === currentSessionId)?.title !== 'New Chat' &&
+                         sessions.find(s => s.id === currentSessionId)?.title !== 'Journal Entry'
+                          ? sessions.find(s => s.id === currentSessionId)?.title
+                          : ''}
+                      </p>
+                    )}
                     <p className="text-sm text-white/80">
                       {journalMode === 'journal'
                         ? 'A safe space to express your thoughts'
