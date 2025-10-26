@@ -75,7 +75,7 @@ export function StreaksAndAchievements() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
       <div className="bg-white rounded-3xl shadow-lg border border-gray-100 p-6">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
@@ -87,10 +87,11 @@ export function StreaksAndAchievements() {
               <p className="text-xs text-gray-500">Keep it going!</p>
             </div>
           </div>
-          <div className="text-right">
-            <p className="text-3xl font-bold text-gray-800">{profile?.current_streak || 0}</p>
-            <p className="text-xs text-gray-500">days</p>
-          </div>
+        </div>
+
+        <div className="text-center mb-4">
+          <p className="text-5xl font-bold text-gray-800">{profile?.current_streak || 0}</p>
+          <p className="text-sm text-gray-500 mt-1">days</p>
         </div>
 
         <div className="bg-gradient-to-r from-orange-100 to-red-100 rounded-2xl p-4 cursor-pointer hover:shadow-md transition-all active:scale-[0.98]">

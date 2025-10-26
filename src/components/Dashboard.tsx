@@ -1,5 +1,4 @@
-import { LogOut, Menu, X, Brain } from 'lucide-react';
-import { useState } from 'react';
+import { LogOut, Brain } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { ChatBot } from './ChatBot';
 import { ProgressTracker } from './ProgressTracker';
@@ -8,7 +7,6 @@ import { MoodTracker } from './MoodTracker';
 
 export function Dashboard() {
   const { profile, signOut } = useAuth();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-pink-50 via-purple-50 to-blue-50">
@@ -19,22 +17,14 @@ export function Dashboard() {
       </div>
 
       <nav className="relative bg-white/60 backdrop-blur-md border-b border-gray-100 px-6 py-4">
-        <div className="max-w-[1800px] mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="lg:hidden w-10 h-10 flex items-center justify-center rounded-xl hover:bg-gray-100 transition-colors active:scale-95"
-            >
-              {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-            </button>
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-gradient-to-br from-pink-500 via-purple-500 to-blue-500 rounded-lg flex items-center justify-center">
-                <Brain className="w-5 h-5 text-white" />
-              </div>
-              <h1 className="text-2xl font-semibold bg-gradient-to-r from-pink-500 via-purple-500 to-blue-500 bg-clip-text text-transparent">
-                Mindshift
-              </h1>
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-gradient-to-br from-pink-500 via-purple-500 to-blue-500 rounded-lg flex items-center justify-center">
+              <Brain className="w-5 h-5 text-white" />
             </div>
+            <h1 className="text-2xl font-semibold bg-gradient-to-r from-pink-500 via-purple-500 to-blue-500 bg-clip-text text-transparent">
+              Mindshift
+            </h1>
           </div>
           <div className="flex items-center gap-4">
             <div className="text-right hidden sm:block">
@@ -52,46 +42,20 @@ export function Dashboard() {
         </div>
       </nav>
 
-      <div className="relative max-w-[1800px] mx-auto p-4 sm:p-6 lg:p-8">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          <div className="lg:col-span-8 space-y-6">
-            <div className="h-[600px]">
-              <ChatBot />
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <ProgressTracker />
-              <MoodTracker />
-            </div>
+      <div className="relative max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
+        <div className="space-y-6">
+          <div className="h-[600px]">
+            <ChatBot />
           </div>
 
-          <div className={`
-            lg:col-span-4
-            fixed lg:relative inset-0 lg:inset-auto
-            bg-pink-50/95 lg:bg-transparent
-            backdrop-blur-lg lg:backdrop-blur-none
-            z-50 lg:z-auto
-            transition-transform duration-300
-            ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
-          `}>
-            <div className="h-full overflow-y-auto p-6 lg:p-0">
-              <button
-                onClick={() => setSidebarOpen(false)}
-                className="lg:hidden absolute top-4 right-4 w-10 h-10 flex items-center justify-center rounded-xl bg-white hover:bg-gray-100 transition-colors active:scale-95"
-              >
-                <X className="w-5 h-5" />
-              </button>
-              <StreaksAndAchievements />
-            </div>
+          <StreaksAndAchievements />
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <ProgressTracker />
+            <MoodTracker />
           </div>
         </div>
       </div>
-
-      {sidebarOpen && (
-        <div
-          className="lg:hidden fixed inset-0 bg-black/20 backdrop-blur-sm z-40"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
     </div>
   );
 }
