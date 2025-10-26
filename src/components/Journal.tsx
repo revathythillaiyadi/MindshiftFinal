@@ -4,7 +4,7 @@ import { supabase, ChatMessage, ChatSession } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 
 interface JournalProps {
-  onBackToAssistant?: () => void;
+  onOpenSettings?: () => void;
 }
 
 const reflectiveResponses = [
@@ -27,7 +27,7 @@ const journalPrompts = [
   "Describe a sensation you felt today without naming the emotion.",
 ];
 
-export function Journal({ onBackToAssistant }: JournalProps = {}) {
+export function Journal({ onOpenSettings }: JournalProps = {}) {
   const [entries, setEntries] = useState<ChatSession[]>([]);
   const [currentEntry, setCurrentEntry] = useState<ChatSession | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -40,6 +40,7 @@ export function Journal({ onBackToAssistant }: JournalProps = {}) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
+  const recordedTextRef = useRef<string>('');
   const { user } = useAuth();
 
   useEffect(() => {
@@ -323,10 +324,12 @@ export function Journal({ onBackToAssistant }: JournalProps = {}) {
       recognition.interimResults = true;
       recognition.lang = 'en-US';
 
-      let finalTranscript = '';
+      const startingText = input;
+      recordedTextRef.current = '';
 
       recognition.onresult = (event: any) => {
         let interimTranscript = '';
+        let finalTranscript = '';
 
         for (let i = event.resultIndex; i < event.results.length; i++) {
           const transcript = event.results[i][0].transcript;
@@ -337,11 +340,12 @@ export function Journal({ onBackToAssistant }: JournalProps = {}) {
           }
         }
 
-        setInput(prev => {
-          const baseText = prev.replace(/\[Recording\.\.\.\].*$/, '').trim();
-          const displayText = finalTranscript + interimTranscript;
-          return baseText + (baseText ? ' ' : '') + displayText;
-        });
+        if (finalTranscript) {
+          recordedTextRef.current += finalTranscript;
+        }
+
+        const displayText = recordedTextRef.current + interimTranscript;
+        setInput(startingText + (startingText ? ' ' : '') + displayText);
       };
 
       recognition.onerror = (event: any) => {
@@ -366,6 +370,7 @@ export function Journal({ onBackToAssistant }: JournalProps = {}) {
     if (recognitionRef.current && isRecording) {
       recognitionRef.current.stop();
       setIsRecording(false);
+      recordedTextRef.current = '';
     }
   };
 
@@ -440,11 +445,11 @@ export function Journal({ onBackToAssistant }: JournalProps = {}) {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    {onBackToAssistant && (
+                    {onOpenSettings && (
                       <button
-                        onClick={onBackToAssistant}
+                        onClick={onOpenSettings}
                         className="p-2 hover:bg-blue-100 text-blue-600 rounded-lg transition-all active:scale-95"
-                        title="Back to Assistant"
+                        title="Settings"
                       >
                         <Settings className="w-5 h-5" />
                       </button>
