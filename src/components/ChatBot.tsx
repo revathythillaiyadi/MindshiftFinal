@@ -1,8 +1,24 @@
 import { useState, useEffect, useRef } from 'react';
-import { Send, Brain, Mic, MicOff, Plus, MessageSquare, Settings, History, Trash2, Palette, Smile, BookOpen, Music, Waves } from 'lucide-react';
+import { Send, Brain, Mic, MicOff, Plus, MessageSquare, Settings, History, Trash2, Palette, Smile, BookOpen, Music, Waves, AlertCircle } from 'lucide-react';
 import { supabase, ChatMessage, ChatSession } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { Journal } from './Journal';
+
+const CRISIS_KEYWORDS = [
+  'kill myself',
+  'end it all',
+  'suicide',
+  'going to hurt myself',
+  'no way out',
+  'take my life',
+  'say goodbye',
+  'want to die',
+  'better off dead',
+  'cant go on',
+  "can't go on",
+  'end my life',
+  'harm myself'
+];
 
 const reframingPrompts = [
   "That sounds challenging. What might be a different way to look at this situation?",
@@ -67,6 +83,7 @@ export function ChatBot() {
   const [ambientSound, setAmbientSound] = useState<string | null>(null);
   const [ambientVolume, setAmbientVolume] = useState(0.5);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isCrisisMode, setIsCrisisMode] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
@@ -283,8 +300,54 @@ export function ChatBot() {
     ));
   };
 
+  const detectCrisisKeywords = (message: string): boolean => {
+    const lowerMessage = message.toLowerCase();
+    return CRISIS_KEYWORDS.some(keyword => lowerMessage.includes(keyword));
+  };
+
+  const getCrisisResponse = (): string => {
+    return `I hear how much pain you're in, and I want you to know you don't have to face this alone.
+
+**Please reach out for immediate support:**
+
+🇺🇸 **National Suicide & Crisis Lifeline:** 988
+🚨 **Emergency Services:** 911
+
+These services are available 24/7 with trained professionals who care and want to help.
+
+Can you tell me one thing you need me to know about your feelings right now?`;
+  };
+
+  const triggerCrisisProtocol = async () => {
+    setIsCrisisMode(true);
+
+    const crisisMessage: ChatMessage = {
+      id: Date.now().toString(),
+      role: 'assistant',
+      content: getCrisisResponse(),
+      timestamp: new Date().toISOString()
+    };
+
+    setMessages(prev => [...prev, crisisMessage]);
+
+    if (currentSessionId && user) {
+      await supabase.from('chat_messages').insert({
+        user_id: user.id,
+        session_id: currentSessionId,
+        role: 'assistant',
+        content: crisisMessage.content,
+        is_crisis_response: true
+      });
+    }
+  };
+
   const generateReframingResponse = (userMessage: string): string => {
     const lowerMessage = userMessage.toLowerCase();
+
+    if (detectCrisisKeywords(userMessage)) {
+      triggerCrisisProtocol();
+      return '';
+    }
 
     if (lowerMessage.includes('stress') || lowerMessage.includes('anxious') || lowerMessage.includes('worried')) {
       return "I hear that you're feeling stressed. Remember, stress often shows us what we care about. What's one small step you could take right now to ease this feeling?";
@@ -308,6 +371,11 @@ export function ChatBot() {
   const generateJournalResponse = (userMessage: string, messageHistory: ChatMessage[]): string => {
     const lowerMessage = userMessage.toLowerCase();
     const userMessageCount = messageHistory.filter(m => m.role === 'user').length;
+
+    if (detectCrisisKeywords(userMessage)) {
+      triggerCrisisProtocol();
+      return '';
+    }
 
     if (lowerMessage.includes('advice') || lowerMessage.includes('help me') || lowerMessage.includes('what should')) {
       return "I hear you, but in this mode, I'm simply here to listen without suggesting anything. We can go to the 'Reframe Mode' if you'd like an exercise.";
@@ -384,6 +452,11 @@ export function ChatBot() {
       const responseContent = journalMode === 'journal'
         ? generateJournalResponse(userMessage, messages)
         : generateReframingResponse(userMessage);
+
+      if (responseContent === '') {
+        setLoading(false);
+        return;
+      }
 
       const assistantMsg: ChatMessage = {
         id: crypto.randomUUID(),
@@ -1556,6 +1629,14 @@ export function ChatBot() {
                 </div>
               )}
               <div className="flex gap-3">
+                <button
+                  onClick={triggerCrisisProtocol}
+                  className="px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded-2xl hover:shadow-lg transform hover:-translate-y-0.5 active:scale-95 transition-all font-semibold flex items-center gap-2 text-sm"
+                  title="Get immediate crisis support"
+                >
+                  <AlertCircle className="w-5 h-5" />
+                  <span className="hidden sm:inline">SOS</span>
+                </button>
                 <input
                   type="text"
                   value={input}
