@@ -756,12 +756,18 @@ export function ChatBot() {
                   key={session.id}
                   className={`group relative flex items-center gap-2 px-3 py-2 rounded-xl cursor-pointer transition-all ${
                     currentSessionId === session.id
-                      ? 'bg-gradient-to-r from-pink-100 to-purple-100'
+                      ? session.journal_mode === 'journal'
+                        ? 'bg-gradient-to-r from-emerald-100 to-teal-100'
+                        : 'bg-gradient-to-r from-pink-100 to-purple-100'
                       : 'hover:bg-gray-100'
                   }`}
                   onClick={() => setCurrentSessionId(session.id)}
                 >
-                  <MessageSquare className="w-4 h-4 text-gray-500 flex-shrink-0" />
+                  {session.journal_mode === 'journal' ? (
+                    <BookOpen className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                  ) : (
+                    <Brain className="w-4 h-4 text-purple-600 flex-shrink-0" />
+                  )}
                   <span className="text-sm text-gray-700 truncate flex-1">{session.title}</span>
                   <button
                     onClick={(e) => {
@@ -769,6 +775,7 @@ export function ChatBot() {
                       deleteSession(session.id);
                     }}
                     className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-100 rounded transition-all"
+                    title="Delete this conversation"
                   >
                     <Trash2 className="w-3 h-3 text-red-500" />
                   </button>
@@ -822,6 +829,66 @@ export function ChatBot() {
               <h2 className="text-2xl font-semibold text-gray-800 mb-6">Settings</h2>
 
               <div className="space-y-6">
+                <div className="bg-gray-50 rounded-2xl p-6">
+                  <h3 className="text-lg font-semibold text-gray-800 mb-4">Chat Mode</h3>
+
+                  <div className="mb-6">
+                    <p className="text-sm font-medium text-gray-700 mb-3">Select Your Mode</p>
+                    <div className="grid grid-cols-2 gap-4">
+                      <button
+                        onClick={() => {
+                          if (currentSessionId) {
+                            const session = sessions.find(s => s.id === currentSessionId);
+                            if (session?.journal_mode !== 'reframe') {
+                              createNewSession('reframe');
+                            }
+                          } else {
+                            createNewSession('reframe');
+                          }
+                        }}
+                        className={`p-4 rounded-xl border-2 transition-all ${
+                          journalMode === 'reframe'
+                            ? 'border-purple-400 bg-gradient-to-br from-pink-50 to-purple-50'
+                            : 'border-gray-200 bg-white hover:border-purple-200'
+                        }`}
+                      >
+                        <Brain className={`w-8 h-8 mx-auto mb-2 ${journalMode === 'reframe' ? 'text-purple-600' : 'text-gray-400'}`} />
+                        <p className="font-semibold text-sm text-gray-800">Reframe Mode</p>
+                        <p className="text-xs text-gray-500 mt-1">Get help reframing negative thoughts</p>
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (currentSessionId) {
+                            const session = sessions.find(s => s.id === currentSessionId);
+                            if (session?.journal_mode !== 'journal') {
+                              createNewSession('journal');
+                            }
+                          } else {
+                            createNewSession('journal');
+                          }
+                        }}
+                        className={`p-4 rounded-xl border-2 transition-all ${
+                          journalMode === 'journal'
+                            ? 'border-emerald-400 bg-gradient-to-br from-emerald-50 to-teal-50'
+                            : 'border-gray-200 bg-white hover:border-emerald-200'
+                        }`}
+                      >
+                        <BookOpen className={`w-8 h-8 mx-auto mb-2 ${journalMode === 'journal' ? 'text-emerald-600' : 'text-gray-400'}`} />
+                        <p className="font-semibold text-sm text-gray-800">Journal Mode</p>
+                        <p className="text-xs text-gray-500 mt-1">Express freely without suggestions</p>
+                      </button>
+                    </div>
+                    <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-xl">
+                      <p className="text-xs text-blue-800">
+                        <span className="font-semibold">Current: </span>
+                        {journalMode === 'journal'
+                          ? 'Journal Mode - A safe space for reflective writing'
+                          : 'Reframe Mode - Cognitive reframing assistance'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="bg-gray-50 rounded-2xl p-6">
                   <h3 className="text-lg font-semibold text-gray-800 mb-4">Voice Settings</h3>
 
