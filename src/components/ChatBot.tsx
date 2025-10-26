@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { Send, Brain, Mic, MicOff, Volume2, VolumeX } from 'lucide-react';
-import { supabase, ChatMessage } from '../lib/supabase';
+import { Send, Brain, Mic, MicOff, Volume2, VolumeX, Plus, MessageSquare, Settings, History, Trash2 } from 'lucide-react';
+import { supabase, ChatMessage, ChatSession } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 
 const reframingPrompts = [
@@ -13,18 +13,22 @@ const reframingPrompts = [
 
 export function ChatBot() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [sessions, setSessions] = useState<ChatSession[]>([]);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [voiceEnabled, setVoiceEnabled] = useState(true);
+  const [showSidebar, setShowSidebar] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
   const { user } = useAuth();
 
   useEffect(() => {
     if (user) {
-      loadMessages();
+      loadSessions();
     }
 
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
@@ -58,22 +62,100 @@ export function ChatBot() {
   }, [user]);
 
   useEffect(() => {
+    if (currentSessionId) {
+      loadMessages(currentSessionId);
+    }
+  }, [currentSessionId]);
+
+  useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const loadMessages = async () => {
+  const loadSessions = async () => {
+    if (!user) return;
+
+    const { data } = await supabase
+      .from('chat_sessions')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('updated_at', { ascending: false });
+
+    if (data && data.length > 0) {
+      setSessions(data);
+      setCurrentSessionId(data[0].id);
+    } else {
+      createNewSession();
+    }
+  };
+
+  const loadMessages = async (sessionId: string) => {
     if (!user) return;
 
     const { data } = await supabase
       .from('chat_messages')
       .select('*')
       .eq('user_id', user.id)
-      .order('created_at', { ascending: true })
-      .limit(50);
+      .eq('session_id', sessionId)
+      .order('created_at', { ascending: true });
 
     if (data) {
       setMessages(data);
     }
+  };
+
+  const createNewSession = async () => {
+    if (!user) return;
+
+    const { data, error } = await supabase
+      .from('chat_sessions')
+      .insert({
+        user_id: user.id,
+        title: 'New Chat',
+      })
+      .select()
+      .single();
+
+    if (data && !error) {
+      setSessions(prev => [data, ...prev]);
+      setCurrentSessionId(data.id);
+      setMessages([]);
+    }
+  };
+
+  const deleteSession = async (sessionId: string) => {
+    if (!user) return;
+
+    await supabase
+      .from('chat_sessions')
+      .delete()
+      .eq('id', sessionId);
+
+    setSessions(prev => prev.filter(s => s.id !== sessionId));
+
+    if (currentSessionId === sessionId) {
+      const remainingSessions = sessions.filter(s => s.id !== sessionId);
+      if (remainingSessions.length > 0) {
+        setCurrentSessionId(remainingSessions[0].id);
+      } else {
+        createNewSession();
+      }
+    }
+  };
+
+  const updateSessionTitle = async (sessionId: string, firstMessage: string) => {
+    const title = firstMessage.slice(0, 50) + (firstMessage.length > 50 ? '...' : '');
+
+    await supabase
+      .from('chat_sessions')
+      .update({
+        title,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', sessionId);
+
+    setSessions(prev => prev.map(s =>
+      s.id === sessionId ? { ...s, title, updated_at: new Date().toISOString() } : s
+    ));
   };
 
   const generateReframingResponse = (userMessage: string): string => {
@@ -99,7 +181,7 @@ export function ChatBot() {
   };
 
   const handleSend = async () => {
-    if (!input.trim() || !user || loading) return;
+    if (!input.trim() || !user || loading || !currentSessionId) return;
 
     const userMessage = input.trim();
     setInput('');
@@ -108,6 +190,7 @@ export function ChatBot() {
     const userMsg: ChatMessage = {
       id: crypto.randomUUID(),
       user_id: user.id,
+      session_id: currentSessionId,
       role: 'user',
       content: userMessage,
       reframed_content: null,
@@ -116,11 +199,17 @@ export function ChatBot() {
 
     setMessages(prev => [...prev, userMsg]);
 
-    await supabase.from('chat_messages').insert({
+    const { data: insertedMsg } = await supabase.from('chat_messages').insert({
       user_id: user.id,
+      session_id: currentSessionId,
       role: 'user',
       content: userMessage,
-    });
+    }).select().single();
+
+    const session = sessions.find(s => s.id === currentSessionId);
+    if (session && session.title === 'New Chat') {
+      updateSessionTitle(currentSessionId, userMessage);
+    }
 
     setTimeout(async () => {
       const responseContent = generateReframingResponse(userMessage);
@@ -128,6 +217,7 @@ export function ChatBot() {
       const assistantMsg: ChatMessage = {
         id: crypto.randomUUID(),
         user_id: user.id,
+        session_id: currentSessionId,
         role: 'assistant',
         content: responseContent,
         reframed_content: null,
@@ -138,9 +228,15 @@ export function ChatBot() {
 
       await supabase.from('chat_messages').insert({
         user_id: user.id,
+        session_id: currentSessionId,
         role: 'assistant',
         content: responseContent,
       });
+
+      await supabase
+        .from('chat_sessions')
+        .update({ updated_at: new Date().toISOString() })
+        .eq('id', currentSessionId);
 
       setLoading(false);
 
@@ -196,104 +292,237 @@ export function ChatBot() {
   };
 
   return (
-    <div className="flex flex-col h-full bg-white rounded-3xl shadow-lg border border-gray-100 overflow-hidden">
-      <div className="bg-gradient-to-r from-pink-500 via-purple-500 to-blue-500 p-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className={`w-10 h-10 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center ${isSpeaking ? 'animate-pulse' : ''}`}>
-              <Brain className="w-5 h-5 text-white" />
+    <div className="flex h-full bg-white rounded-3xl shadow-lg border border-gray-100 overflow-hidden">
+      <div className={`${showSidebar ? 'w-64' : 'w-16'} bg-gray-50 border-r border-gray-200 transition-all duration-300 flex flex-col`}>
+        <div className="p-4 border-b border-gray-200">
+          {showSidebar ? (
+            <button
+              onClick={createNewSession}
+              className="w-full flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-pink-500 via-purple-500 to-blue-500 text-white rounded-xl hover:shadow-lg transition-all active:scale-95 text-sm font-medium"
+            >
+              <Plus className="w-4 h-4" />
+              <span>New Chat</span>
+            </button>
+          ) : (
+            <button
+              onClick={createNewSession}
+              className="w-full flex items-center justify-center p-2 bg-gradient-to-r from-pink-500 via-purple-500 to-blue-500 text-white rounded-xl hover:shadow-lg transition-all active:scale-95"
+              title="New Chat"
+            >
+              <Plus className="w-5 h-5" />
+            </button>
+          )}
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-2">
+          {showSidebar ? (
+            <div className="space-y-2">
+              {sessions.map((session) => (
+                <div
+                  key={session.id}
+                  className={`group relative flex items-center gap-2 px-3 py-2 rounded-xl cursor-pointer transition-all ${
+                    currentSessionId === session.id
+                      ? 'bg-gradient-to-r from-pink-100 to-purple-100'
+                      : 'hover:bg-gray-100'
+                  }`}
+                  onClick={() => setCurrentSessionId(session.id)}
+                >
+                  <MessageSquare className="w-4 h-4 text-gray-500 flex-shrink-0" />
+                  <span className="text-sm text-gray-700 truncate flex-1">{session.title}</span>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      deleteSession(session.id);
+                    }}
+                    className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-100 rounded transition-all"
+                  >
+                    <Trash2 className="w-3 h-3 text-red-500" />
+                  </button>
+                </div>
+              ))}
             </div>
-            <div>
-              <h2 className="text-xl font-semibold text-white">Mindshift Assistant</h2>
-              <p className="text-sm text-white/80">{isSpeaking ? 'Speaking...' : 'Here to help you reframe your thoughts'}</p>
+          ) : (
+            <div className="space-y-2">
+              {sessions.slice(0, 5).map((session) => (
+                <button
+                  key={session.id}
+                  onClick={() => setCurrentSessionId(session.id)}
+                  className={`w-full p-2 rounded-xl transition-all ${
+                    currentSessionId === session.id
+                      ? 'bg-gradient-to-r from-pink-100 to-purple-100'
+                      : 'hover:bg-gray-100'
+                  }`}
+                  title={session.title}
+                >
+                  <MessageSquare className="w-5 h-5 text-gray-500 mx-auto" />
+                </button>
+              ))}
             </div>
-          </div>
+          )}
+        </div>
+
+        <div className="p-2 border-t border-gray-200 space-y-2">
           <button
-            onClick={() => {
-              setVoiceEnabled(!voiceEnabled);
-              if (isSpeaking) stopSpeaking();
-            }}
-            className="w-10 h-10 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-white/30 transition-all active:scale-95"
-            title={voiceEnabled ? 'Disable voice' : 'Enable voice'}
+            onClick={() => setShowSidebar(!showSidebar)}
+            className="w-full flex items-center gap-2 px-3 py-2 hover:bg-gray-100 rounded-xl transition-all active:scale-95"
+            title="Toggle Sidebar"
           >
-            {voiceEnabled ? <Volume2 className="w-5 h-5 text-white" /> : <VolumeX className="w-5 h-5 text-white" />}
+            <History className="w-5 h-5 text-gray-600" />
+            {showSidebar && <span className="text-sm text-gray-700">History</span>}
+          </button>
+          <button
+            onClick={() => setShowSettings(!showSettings)}
+            className="w-full flex items-center gap-2 px-3 py-2 hover:bg-gray-100 rounded-xl transition-all active:scale-95"
+            title="Settings"
+          >
+            <Settings className="w-5 h-5 text-gray-600" />
+            {showSidebar && <span className="text-sm text-gray-700">Settings</span>}
           </button>
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-6 space-y-4">
-        {messages.length === 0 && (
-          <div className="text-center py-12">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-pink-500 via-purple-500 to-blue-500 rounded-2xl mb-4 opacity-20">
-              <Brain className="w-8 h-8 text-white" />
-            </div>
-            <p className="text-gray-400 text-sm">Start a conversation to begin your mindful journey</p>
-          </div>
-        )}
+      <div className="flex flex-col flex-1">
+        {showSettings ? (
+          <div className="flex-1 p-6 overflow-y-auto">
+            <div className="max-w-2xl mx-auto">
+              <h2 className="text-2xl font-semibold text-gray-800 mb-6">Settings</h2>
 
-        {messages.map((message) => (
-          <div
-            key={message.id}
-            className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-          >
-            <div
-              className={`max-w-[80%] px-5 py-3 rounded-2xl transition-all hover:scale-[1.02] ${
-                message.role === 'user'
-                  ? 'bg-gradient-to-r from-pink-100 to-purple-100 text-gray-800 rounded-br-md'
-                  : 'bg-gradient-to-r from-purple-100 to-blue-100 text-gray-800 rounded-bl-md'
-              }`}
-            >
-              <p className="text-sm leading-relaxed">{message.content}</p>
-            </div>
-          </div>
-        ))}
+              <div className="space-y-6">
+                <div className="bg-gray-50 rounded-2xl p-6">
+                  <h3 className="text-lg font-semibold text-gray-800 mb-4">Voice Settings</h3>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">Voice Responses</p>
+                      <p className="text-xs text-gray-500">Hear AI responses read aloud</p>
+                    </div>
+                    <button
+                      onClick={() => setVoiceEnabled(!voiceEnabled)}
+                      className={`relative w-12 h-6 rounded-full transition-all ${
+                        voiceEnabled ? 'bg-gradient-to-r from-pink-500 to-purple-500' : 'bg-gray-300'
+                      }`}
+                    >
+                      <div
+                        className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${
+                          voiceEnabled ? 'transform translate-x-6' : ''
+                        }`}
+                      />
+                    </button>
+                  </div>
+                </div>
 
-        {loading && (
-          <div className="flex justify-start">
-            <div className="bg-gradient-to-r from-purple-100 to-blue-100 px-5 py-3 rounded-2xl rounded-bl-md">
-              <div className="flex gap-2">
-                <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                <div className="w-2 h-2 bg-pink-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                <div className="bg-gray-50 rounded-2xl p-6">
+                  <h3 className="text-lg font-semibold text-gray-800 mb-4">About</h3>
+                  <p className="text-sm text-gray-600 leading-relaxed">
+                    Mindshift is your AI-powered companion for mental wellness and personal growth.
+                    Through thoughtful conversation and cognitive reframing techniques, we help you
+                    develop resilience and discover new perspectives.
+                  </p>
+                </div>
               </div>
             </div>
           </div>
+        ) : (
+          <>
+            <div className="bg-gradient-to-r from-pink-500 via-purple-500 to-blue-500 p-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className={`w-10 h-10 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center ${isSpeaking ? 'animate-pulse' : ''}`}>
+                    <Brain className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-semibold text-white">Mindshift Assistant</h2>
+                    <p className="text-sm text-white/80">{isSpeaking ? 'Speaking...' : 'Here to help you reframe your thoughts'}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    setVoiceEnabled(!voiceEnabled);
+                    if (isSpeaking) stopSpeaking();
+                  }}
+                  className="w-10 h-10 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-white/30 transition-all active:scale-95"
+                  title={voiceEnabled ? 'Disable voice' : 'Enable voice'}
+                >
+                  {voiceEnabled ? <Volume2 className="w-5 h-5 text-white" /> : <VolumeX className="w-5 h-5 text-white" />}
+                </button>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6 space-y-4">
+              {messages.length === 0 && (
+                <div className="text-center py-12">
+                  <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-pink-500 via-purple-500 to-blue-500 rounded-2xl mb-4 opacity-20">
+                    <Brain className="w-8 h-8 text-white" />
+                  </div>
+                  <p className="text-gray-400 text-sm">Start a conversation to begin your mindful journey</p>
+                </div>
+              )}
+
+              {messages.map((message) => (
+                <div
+                  key={message.id}
+                  className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                >
+                  <div
+                    className={`max-w-[80%] px-5 py-3 rounded-2xl transition-all hover:scale-[1.02] ${
+                      message.role === 'user'
+                        ? 'bg-gradient-to-r from-pink-100 to-purple-100 text-gray-800 rounded-br-md'
+                        : 'bg-gradient-to-r from-purple-100 to-blue-100 text-gray-800 rounded-bl-md'
+                    }`}
+                  >
+                    <p className="text-sm leading-relaxed">{message.content}</p>
+                  </div>
+                </div>
+              ))}
+
+              {loading && (
+                <div className="flex justify-start">
+                  <div className="bg-gradient-to-r from-purple-100 to-blue-100 px-5 py-3 rounded-2xl rounded-bl-md">
+                    <div className="flex gap-2">
+                      <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                      <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                      <div className="w-2 h-2 bg-pink-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div ref={messagesEndRef} />
+            </div>
+
+            <div className="p-6 bg-gray-50 border-t border-gray-100">
+              <div className="flex gap-3">
+                <input
+                  type="text"
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyPress={handleKeyPress}
+                  placeholder={isRecording ? "Listening..." : "Share what's on your mind..."}
+                  className="flex-1 px-5 py-3 bg-white border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-pink-400 focus:border-transparent transition-all text-sm active:scale-[0.99]"
+                  disabled={loading || isRecording}
+                />
+                <button
+                  onClick={isRecording ? stopVoiceRecording : startVoiceRecording}
+                  disabled={loading}
+                  className={`px-6 py-3 rounded-2xl hover:shadow-lg transform hover:-translate-y-0.5 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:transform-none ${
+                    isRecording
+                      ? 'bg-red-500 text-white animate-pulse'
+                      : 'bg-white border-2 border-pink-500 text-pink-500'
+                  }`}
+                  title={isRecording ? 'Stop recording' : 'Start voice input'}
+                >
+                  {isRecording ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+                </button>
+                <button
+                  onClick={handleSend}
+                  disabled={!input.trim() || loading}
+                  className="px-6 py-3 bg-gradient-to-r from-pink-500 via-purple-500 to-blue-500 text-white rounded-2xl hover:shadow-lg transform hover:-translate-y-0.5 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:transform-none"
+                >
+                  <Send className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+          </>
         )}
-
-        <div ref={messagesEndRef} />
-      </div>
-
-      <div className="p-6 bg-gray-50 border-t border-gray-100">
-        <div className="flex gap-3">
-          <input
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyPress={handleKeyPress}
-            placeholder={isRecording ? "Listening..." : "Share what's on your mind..."}
-            className="flex-1 px-5 py-3 bg-white border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-pink-400 focus:border-transparent transition-all text-sm active:scale-[0.99]"
-            disabled={loading || isRecording}
-          />
-          <button
-            onClick={isRecording ? stopVoiceRecording : startVoiceRecording}
-            disabled={loading}
-            className={`px-6 py-3 rounded-2xl hover:shadow-lg transform hover:-translate-y-0.5 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:transform-none ${
-              isRecording
-                ? 'bg-red-500 text-white animate-pulse'
-                : 'bg-white border-2 border-pink-500 text-pink-500'
-            }`}
-            title={isRecording ? 'Stop recording' : 'Start voice input'}
-          >
-            {isRecording ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
-          </button>
-          <button
-            onClick={handleSend}
-            disabled={!input.trim() || loading}
-            className="px-6 py-3 bg-gradient-to-r from-pink-500 via-purple-500 to-blue-500 text-white rounded-2xl hover:shadow-lg transform hover:-translate-y-0.5 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:transform-none"
-          >
-            <Send className="w-5 h-5" />
-          </button>
-        </div>
       </div>
     </div>
   );
