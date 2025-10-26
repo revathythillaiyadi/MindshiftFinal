@@ -898,8 +898,6 @@ Can you tell me one thing you need me to know about your feelings right now?`;
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-3xl">
             <button
               onClick={() => {
-                setJournalMode('reframe');
-                setCurrentView('chat');
                 createNewSession('reframe');
               }}
               className="group p-8 rounded-2xl border-4 border-purple-200 bg-gradient-to-br from-pink-50 to-purple-50 hover:border-purple-400 hover:shadow-xl transition-all transform hover:-translate-y-1"
