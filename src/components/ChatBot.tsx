@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Send, Brain, Mic, MicOff, Volume2, VolumeX, Plus, MessageSquare, Settings, History, Trash2 } from 'lucide-react';
+import { Send, Brain, Mic, MicOff, Volume2, VolumeX, Plus, MessageSquare, Settings, History, Trash2, Palette, Smile } from 'lucide-react';
 import { supabase, ChatMessage, ChatSession } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -41,6 +41,9 @@ export function ChatBot() {
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [showSidebar, setShowSidebar] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [chatBackground, setChatBackground] = useState('gradient');
+  const [emojiEnabled, setEmojiEnabled] = useState(true);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
   const { user, profile } = useAuth();
@@ -69,6 +72,14 @@ export function ChatBot() {
 
       if (profile?.voice_enabled !== undefined) {
         setVoiceEnabled(profile.voice_enabled);
+      }
+
+      if (profile?.chat_background) {
+        setChatBackground(profile.chat_background);
+      }
+
+      if (profile?.emoji_enabled !== undefined) {
+        setEmojiEnabled(profile.emoji_enabled);
       }
     };
 
@@ -374,6 +385,53 @@ export function ChatBot() {
     setIsSpeaking(false);
   };
 
+  const updateChatBackground = async (background: string) => {
+    if (!user) return;
+
+    setChatBackground(background);
+
+    await supabase
+      .from('profiles')
+      .update({ chat_background: background })
+      .eq('id', user.id);
+  };
+
+  const updateEmojiEnabled = async (enabled: boolean) => {
+    if (!user) return;
+
+    setEmojiEnabled(enabled);
+
+    await supabase
+      .from('profiles')
+      .update({ emoji_enabled: enabled })
+      .eq('id', user.id);
+  };
+
+  const insertEmoji = (emoji: string) => {
+    setInput(prev => prev + emoji);
+    setShowEmojiPicker(false);
+  };
+
+  const getBackgroundStyle = (bg: string): string => {
+    const backgrounds: { [key: string]: string } = {
+      gradient: 'bg-gradient-to-br from-pink-50 via-purple-50 to-blue-50',
+      nature: 'bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50',
+      animals: 'bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50',
+      abstract: 'bg-gradient-to-br from-rose-50 via-fuchsia-50 to-violet-50',
+      sky: 'bg-gradient-to-br from-sky-50 via-blue-50 to-cyan-50',
+      universe: 'bg-gradient-to-br from-slate-900 via-purple-900 to-indigo-900',
+      solid: 'bg-white',
+    };
+    return backgrounds[bg] || backgrounds.gradient;
+  };
+
+  const emojis = [
+    '😊', '😂', '🥰', '😍', '🤗', '😌', '🙏', '💪',
+    '✨', '🌟', '💫', '🌈', '☀️', '🌸', '🌺', '🌻',
+    '💖', '💕', '💗', '💝', '🎉', '🎊', '🎈', '🔥',
+    '👍', '👏', '🤝', '💯', '✅', '⭐', '🏆', '🎯'
+  ];
+
   return (
     <div className="flex h-full bg-white rounded-3xl shadow-lg border border-gray-100 overflow-hidden">
       <div className={`${showSidebar ? 'w-64' : 'w-16'} bg-gray-50 border-r border-gray-200 transition-all duration-300 flex flex-col`}>
@@ -602,6 +660,62 @@ export function ChatBot() {
                 </div>
 
                 <div className="bg-gray-50 rounded-2xl p-6">
+                  <h3 className="text-lg font-semibold text-gray-800 mb-4">Chat Appearance</h3>
+
+                  <div className="space-y-4">
+                    <div>
+                      <p className="text-sm font-medium text-gray-700 mb-3">Background Theme</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {[
+                          { id: 'gradient', name: 'Gradient', preview: 'bg-gradient-to-br from-pink-100 via-purple-100 to-blue-100' },
+                          { id: 'nature', name: 'Nature', preview: 'bg-gradient-to-br from-green-100 via-emerald-100 to-teal-100' },
+                          { id: 'animals', name: 'Animals', preview: 'bg-gradient-to-br from-amber-100 via-orange-100 to-yellow-100' },
+                          { id: 'abstract', name: 'Abstract', preview: 'bg-gradient-to-br from-rose-100 via-fuchsia-100 to-violet-100' },
+                          { id: 'sky', name: 'Sky', preview: 'bg-gradient-to-br from-sky-100 via-blue-100 to-cyan-100' },
+                          { id: 'universe', name: 'Universe', preview: 'bg-gradient-to-br from-slate-800 via-purple-800 to-indigo-800' },
+                          { id: 'solid', name: 'Clean', preview: 'bg-white border-2 border-gray-200' },
+                        ].map((bg) => (
+                          <button
+                            key={bg.id}
+                            onClick={() => updateChatBackground(bg.id)}
+                            className={`relative p-4 rounded-xl transition-all ${
+                              chatBackground === bg.id
+                                ? 'ring-2 ring-pink-400 scale-105'
+                                : 'hover:scale-105'
+                            }`}
+                          >
+                            <div className={`h-16 rounded-lg ${bg.preview} mb-2`}></div>
+                            <p className="text-xs font-medium text-gray-700">{bg.name}</p>
+                            {chatBackground === bg.id && (
+                              <div className="absolute top-2 right-2 w-2 h-2 bg-pink-500 rounded-full"></div>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+                      <div>
+                        <p className="text-sm font-medium text-gray-700">Emoji Picker</p>
+                        <p className="text-xs text-gray-500">Quick emoji access in chat</p>
+                      </div>
+                      <button
+                        onClick={() => updateEmojiEnabled(!emojiEnabled)}
+                        className={`relative w-12 h-6 rounded-full transition-all ${
+                          emojiEnabled ? 'bg-gradient-to-r from-pink-500 to-purple-500' : 'bg-gray-300'
+                        }`}
+                      >
+                        <div
+                          className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${
+                            emojiEnabled ? 'transform translate-x-6' : ''
+                          }`}
+                        />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-gray-50 rounded-2xl p-6">
                   <h3 className="text-lg font-semibold text-gray-800 mb-4">About</h3>
                   <p className="text-sm text-gray-600 leading-relaxed">
                     Mindshift is your AI-powered companion for mental wellness and personal growth.
@@ -638,7 +752,7 @@ export function ChatBot() {
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6 space-y-4">
+            <div className={`flex-1 overflow-y-auto p-6 space-y-4 ${getBackgroundStyle(chatBackground)} ${chatBackground === 'universe' ? 'text-white' : ''}`}>
               {messages.length === 0 && (
                 <div className="text-center py-12">
                   <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-pink-500 via-purple-500 to-blue-500 rounded-2xl mb-4 opacity-20">
@@ -681,6 +795,30 @@ export function ChatBot() {
             </div>
 
             <div className="p-6 bg-gray-50 border-t border-gray-100">
+              {emojiEnabled && showEmojiPicker && (
+                <div className="mb-3 p-4 bg-white rounded-2xl shadow-lg border border-gray-200">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Quick Emojis</p>
+                    <button
+                      onClick={() => setShowEmojiPicker(false)}
+                      className="text-gray-400 hover:text-gray-600"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-8 gap-2">
+                    {emojis.map((emoji, index) => (
+                      <button
+                        key={index}
+                        onClick={() => insertEmoji(emoji)}
+                        className="text-2xl hover:scale-125 transition-transform active:scale-100 p-1"
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div className="flex gap-3">
                 <input
                   type="text"
@@ -691,6 +829,16 @@ export function ChatBot() {
                   className="flex-1 px-5 py-3 bg-white border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-pink-400 focus:border-transparent transition-all text-sm active:scale-[0.99]"
                   disabled={loading || isRecording}
                 />
+                {emojiEnabled && (
+                  <button
+                    onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                    disabled={loading}
+                    className="px-6 py-3 bg-white border-2 border-purple-500 text-purple-500 rounded-2xl hover:shadow-lg transform hover:-translate-y-0.5 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:transform-none"
+                    title="Emoji picker"
+                  >
+                    <Smile className="w-5 h-5" />
+                  </button>
+                )}
                 <button
                   onClick={isRecording ? stopVoiceRecording : startVoiceRecording}
                   disabled={loading}
