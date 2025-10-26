@@ -412,15 +412,70 @@ export function ChatBot() {
     setShowEmojiPicker(false);
   };
 
-  const getBackgroundStyle = (bg: string): string => {
-    const backgrounds: { [key: string]: string } = {
-      gradient: 'bg-gradient-to-br from-pink-50 via-purple-50 to-blue-50',
-      nature: 'bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50',
-      animals: 'bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50',
-      abstract: 'bg-gradient-to-br from-rose-50 via-fuchsia-50 to-violet-50',
-      sky: 'bg-gradient-to-br from-sky-50 via-blue-50 to-cyan-50',
-      universe: 'bg-gradient-to-br from-slate-900 via-purple-900 to-indigo-900',
-      solid: 'bg-white',
+  const getBackgroundStyle = (bg: string): React.CSSProperties => {
+    const backgrounds: { [key: string]: React.CSSProperties } = {
+      gradient: { background: 'linear-gradient(135deg, #fce7f3 0%, #f3e8ff 50%, #dbeafe 100%)' },
+      nature_waterfall: {
+        backgroundImage: 'url(https://images.pexels.com/photos/1437468/pexels-photo-1437468.jpeg?auto=compress&cs=tinysrgb&w=1920)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat'
+      },
+      nature_forest: {
+        backgroundImage: 'url(https://images.pexels.com/photos/1179229/pexels-photo-1179229.jpeg?auto=compress&cs=tinysrgb&w=1920)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat'
+      },
+      animals_butterfly: {
+        backgroundImage: 'url(https://images.pexels.com/photos/1496373/pexels-photo-1496373.jpeg?auto=compress&cs=tinysrgb&w=1920)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat'
+      },
+      animals_birds: {
+        backgroundImage: 'url(https://images.pexels.com/photos/1661179/pexels-photo-1661179.jpeg?auto=compress&cs=tinysrgb&w=1920)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat'
+      },
+      abstract_colors: {
+        backgroundImage: 'url(https://images.pexels.com/photos/2693212/pexels-photo-2693212.png?auto=compress&cs=tinysrgb&w=1920)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat'
+      },
+      abstract_waves: {
+        backgroundImage: 'url(https://images.pexels.com/photos/1269968/pexels-photo-1269968.jpeg?auto=compress&cs=tinysrgb&w=1920)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat'
+      },
+      sky_sunset: {
+        backgroundImage: 'url(https://images.pexels.com/photos/531756/pexels-photo-531756.jpeg?auto=compress&cs=tinysrgb&w=1920)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat'
+      },
+      sky_clouds: {
+        backgroundImage: 'url(https://images.pexels.com/photos/209831/pexels-photo-209831.jpeg?auto=compress&cs=tinysrgb&w=1920)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat'
+      },
+      universe_galaxy: {
+        backgroundImage: 'url(https://images.pexels.com/photos/1169754/pexels-photo-1169754.jpeg?auto=compress&cs=tinysrgb&w=1920)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat'
+      },
+      universe_stars: {
+        backgroundImage: 'url(https://images.pexels.com/photos/1252890/pexels-photo-1252890.jpeg?auto=compress&cs=tinysrgb&w=1920)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat'
+      },
+      solid: { background: '#ffffff' },
     };
     return backgrounds[bg] || backgrounds.gradient;
   };
@@ -665,32 +720,142 @@ export function ChatBot() {
                   <div className="space-y-4">
                     <div>
                       <p className="text-sm font-medium text-gray-700 mb-3">Background Theme</p>
-                      <div className="grid grid-cols-2 gap-2">
-                        {[
-                          { id: 'gradient', name: 'Gradient', preview: 'bg-gradient-to-br from-pink-100 via-purple-100 to-blue-100' },
-                          { id: 'nature', name: 'Nature', preview: 'bg-gradient-to-br from-green-100 via-emerald-100 to-teal-100' },
-                          { id: 'animals', name: 'Animals', preview: 'bg-gradient-to-br from-amber-100 via-orange-100 to-yellow-100' },
-                          { id: 'abstract', name: 'Abstract', preview: 'bg-gradient-to-br from-rose-100 via-fuchsia-100 to-violet-100' },
-                          { id: 'sky', name: 'Sky', preview: 'bg-gradient-to-br from-sky-100 via-blue-100 to-cyan-100' },
-                          { id: 'universe', name: 'Universe', preview: 'bg-gradient-to-br from-slate-800 via-purple-800 to-indigo-800' },
-                          { id: 'solid', name: 'Clean', preview: 'bg-white border-2 border-gray-200' },
-                        ].map((bg) => (
-                          <button
-                            key={bg.id}
-                            onClick={() => updateChatBackground(bg.id)}
-                            className={`relative p-4 rounded-xl transition-all ${
-                              chatBackground === bg.id
-                                ? 'ring-2 ring-pink-400 scale-105'
-                                : 'hover:scale-105'
-                            }`}
-                          >
-                            <div className={`h-16 rounded-lg ${bg.preview} mb-2`}></div>
-                            <p className="text-xs font-medium text-gray-700">{bg.name}</p>
-                            {chatBackground === bg.id && (
-                              <div className="absolute top-2 right-2 w-2 h-2 bg-pink-500 rounded-full"></div>
-                            )}
-                          </button>
-                        ))}
+                      <div className="space-y-4">
+                        <div>
+                          <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">Nature</p>
+                          <div className="grid grid-cols-2 gap-2">
+                            {[
+                              { id: 'nature_waterfall', name: 'Waterfall', preview: 'https://images.pexels.com/photos/1437468/pexels-photo-1437468.jpeg?auto=compress&cs=tinysrgb&w=400' },
+                              { id: 'nature_forest', name: 'Forest', preview: 'https://images.pexels.com/photos/1179229/pexels-photo-1179229.jpeg?auto=compress&cs=tinysrgb&w=400' },
+                            ].map((bg) => (
+                              <button
+                                key={bg.id}
+                                onClick={() => updateChatBackground(bg.id)}
+                                className={`relative p-2 rounded-xl transition-all overflow-hidden ${
+                                  chatBackground === bg.id
+                                    ? 'ring-2 ring-pink-400 scale-105'
+                                    : 'hover:scale-105'
+                                }`}
+                              >
+                                <img src={bg.preview} alt={bg.name} className="h-20 w-full object-cover rounded-lg mb-1" />
+                                <p className="text-xs font-medium text-gray-700">{bg.name}</p>
+                                {chatBackground === bg.id && (
+                                  <div className="absolute top-3 right-3 w-3 h-3 bg-pink-500 rounded-full border-2 border-white"></div>
+                                )}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div>
+                          <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">Animals</p>
+                          <div className="grid grid-cols-2 gap-2">
+                            {[
+                              { id: 'animals_butterfly', name: 'Butterfly', preview: 'https://images.pexels.com/photos/1496373/pexels-photo-1496373.jpeg?auto=compress&cs=tinysrgb&w=400' },
+                              { id: 'animals_birds', name: 'Birds', preview: 'https://images.pexels.com/photos/1661179/pexels-photo-1661179.jpeg?auto=compress&cs=tinysrgb&w=400' },
+                            ].map((bg) => (
+                              <button
+                                key={bg.id}
+                                onClick={() => updateChatBackground(bg.id)}
+                                className={`relative p-2 rounded-xl transition-all overflow-hidden ${
+                                  chatBackground === bg.id
+                                    ? 'ring-2 ring-pink-400 scale-105'
+                                    : 'hover:scale-105'
+                                }`}
+                              >
+                                <img src={bg.preview} alt={bg.name} className="h-20 w-full object-cover rounded-lg mb-1" />
+                                <p className="text-xs font-medium text-gray-700">{bg.name}</p>
+                                {chatBackground === bg.id && (
+                                  <div className="absolute top-3 right-3 w-3 h-3 bg-pink-500 rounded-full border-2 border-white"></div>
+                                )}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div>
+                          <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">Abstract</p>
+                          <div className="grid grid-cols-2 gap-2">
+                            {[
+                              { id: 'abstract_colors', name: 'Colors', preview: 'https://images.pexels.com/photos/2693212/pexels-photo-2693212.png?auto=compress&cs=tinysrgb&w=400' },
+                              { id: 'abstract_waves', name: 'Waves', preview: 'https://images.pexels.com/photos/1269968/pexels-photo-1269968.jpeg?auto=compress&cs=tinysrgb&w=400' },
+                            ].map((bg) => (
+                              <button
+                                key={bg.id}
+                                onClick={() => updateChatBackground(bg.id)}
+                                className={`relative p-2 rounded-xl transition-all overflow-hidden ${
+                                  chatBackground === bg.id
+                                    ? 'ring-2 ring-pink-400 scale-105'
+                                    : 'hover:scale-105'
+                                }`}
+                              >
+                                <img src={bg.preview} alt={bg.name} className="h-20 w-full object-cover rounded-lg mb-1" />
+                                <p className="text-xs font-medium text-gray-700">{bg.name}</p>
+                                {chatBackground === bg.id && (
+                                  <div className="absolute top-3 right-3 w-3 h-3 bg-pink-500 rounded-full border-2 border-white"></div>
+                                )}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div>
+                          <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">Sky & Universe</p>
+                          <div className="grid grid-cols-2 gap-2">
+                            {[
+                              { id: 'sky_sunset', name: 'Sunset', preview: 'https://images.pexels.com/photos/531756/pexels-photo-531756.jpeg?auto=compress&cs=tinysrgb&w=400' },
+                              { id: 'sky_clouds', name: 'Clouds', preview: 'https://images.pexels.com/photos/209831/pexels-photo-209831.jpeg?auto=compress&cs=tinysrgb&w=400' },
+                              { id: 'universe_galaxy', name: 'Galaxy', preview: 'https://images.pexels.com/photos/1169754/pexels-photo-1169754.jpeg?auto=compress&cs=tinysrgb&w=400' },
+                              { id: 'universe_stars', name: 'Stars', preview: 'https://images.pexels.com/photos/1252890/pexels-photo-1252890.jpeg?auto=compress&cs=tinysrgb&w=400' },
+                            ].map((bg) => (
+                              <button
+                                key={bg.id}
+                                onClick={() => updateChatBackground(bg.id)}
+                                className={`relative p-2 rounded-xl transition-all overflow-hidden ${
+                                  chatBackground === bg.id
+                                    ? 'ring-2 ring-pink-400 scale-105'
+                                    : 'hover:scale-105'
+                                }`}
+                              >
+                                <img src={bg.preview} alt={bg.name} className="h-20 w-full object-cover rounded-lg mb-1" />
+                                <p className="text-xs font-medium text-gray-700">{bg.name}</p>
+                                {chatBackground === bg.id && (
+                                  <div className="absolute top-3 right-3 w-3 h-3 bg-pink-500 rounded-full border-2 border-white"></div>
+                                )}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div>
+                          <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">Simple</p>
+                          <div className="grid grid-cols-2 gap-2">
+                            {[
+                              { id: 'gradient', name: 'Gradient', preview: null, previewStyle: 'bg-gradient-to-br from-pink-100 via-purple-100 to-blue-100' },
+                              { id: 'solid', name: 'Clean', preview: null, previewStyle: 'bg-white border-2 border-gray-200' },
+                            ].map((bg) => (
+                              <button
+                                key={bg.id}
+                                onClick={() => updateChatBackground(bg.id)}
+                                className={`relative p-2 rounded-xl transition-all overflow-hidden ${
+                                  chatBackground === bg.id
+                                    ? 'ring-2 ring-pink-400 scale-105'
+                                    : 'hover:scale-105'
+                                }`}
+                              >
+                                {bg.preview ? (
+                                  <img src={bg.preview} alt={bg.name} className="h-20 w-full object-cover rounded-lg mb-1" />
+                                ) : (
+                                  <div className={`h-20 w-full rounded-lg mb-1 ${bg.previewStyle}`}></div>
+                                )}
+                                <p className="text-xs font-medium text-gray-700">{bg.name}</p>
+                                {chatBackground === bg.id && (
+                                  <div className="absolute top-3 right-3 w-3 h-3 bg-pink-500 rounded-full border-2 border-white"></div>
+                                )}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
                       </div>
                     </div>
 
@@ -752,7 +917,9 @@ export function ChatBot() {
               </div>
             </div>
 
-            <div className={`flex-1 overflow-y-auto p-6 space-y-4 ${getBackgroundStyle(chatBackground)} ${chatBackground === 'universe' ? 'text-white' : ''}`}>
+            <div className="flex-1 overflow-y-auto p-6 space-y-4 relative" style={getBackgroundStyle(chatBackground)}>
+              <div className="absolute inset-0 bg-white/70 backdrop-blur-sm"></div>
+              <div className="relative z-10 space-y-4">
               {messages.length === 0 && (
                 <div className="text-center py-12">
                   <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-pink-500 via-purple-500 to-blue-500 rounded-2xl mb-4 opacity-20">
@@ -792,6 +959,7 @@ export function ChatBot() {
               )}
 
               <div ref={messagesEndRef} />
+              </div>
             </div>
 
             <div className="p-6 bg-gray-50 border-t border-gray-100">
