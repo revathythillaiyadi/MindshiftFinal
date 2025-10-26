@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { Brain } from 'lucide-react';
+import { Brain, Mail, CheckCircle } from 'lucide-react';
 
 export function Auth() {
   const [isSignUp, setIsSignUp] = useState(false);
@@ -9,6 +9,7 @@ export function Auth() {
   const [displayName, setDisplayName] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [verificationSent, setVerificationSent] = useState(false);
   const { signIn, signUp } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -19,6 +20,7 @@ export function Auth() {
     try {
       if (isSignUp) {
         await signUp(email, password, displayName);
+        setVerificationSent(true);
       } else {
         await signIn(email, password);
       }
@@ -46,6 +48,43 @@ export function Auth() {
         </div>
 
         <div className="bg-white/80 backdrop-blur-sm rounded-3xl shadow-xl p-8 border border-gray-100">
+          {verificationSent ? (
+            <div className="text-center py-8 space-y-4">
+              <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-green-400 to-emerald-500 rounded-full mb-4">
+                <Mail className="w-8 h-8 text-white" />
+              </div>
+              <h2 className="text-2xl font-semibold text-gray-800">Check Your Email</h2>
+              <p className="text-gray-600 leading-relaxed">
+                We've sent a verification link to <strong>{email}</strong>. Please check your inbox and click the link to verify your account.
+              </p>
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mt-4">
+                <div className="flex items-start gap-3">
+                  <CheckCircle className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
+                  <div className="text-sm text-blue-800 text-left">
+                    <p className="font-medium mb-1">Next Steps:</p>
+                    <ul className="list-disc list-inside space-y-1 text-blue-700">
+                      <li>Check your email inbox (and spam folder)</li>
+                      <li>Click the verification link</li>
+                      <li>Return here to sign in</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setVerificationSent(false);
+                  setIsSignUp(false);
+                  setEmail('');
+                  setPassword('');
+                  setDisplayName('');
+                }}
+                className="mt-6 px-6 py-3 bg-gradient-to-r from-pink-500 via-purple-500 to-blue-500 text-white rounded-xl hover:shadow-lg transition-all active:scale-95"
+              >
+                Back to Sign In
+              </button>
+            </div>
+          ) : (
+            <>
           <form onSubmit={handleSubmit} className="space-y-5">
             {isSignUp && (
               <div>
@@ -73,7 +112,7 @@ export function Auth() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#A8D5BA] focus:border-transparent transition-all"
+                className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400 focus:border-transparent transition-all active:scale-[0.98]"
                 placeholder="you@example.com"
                 required
               />
@@ -88,7 +127,7 @@ export function Auth() {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#A8D5BA] focus:border-transparent transition-all"
+                className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400 focus:border-transparent transition-all active:scale-[0.98]"
                 placeholder="••••••••"
                 required
                 minLength={6}
@@ -121,6 +160,8 @@ export function Auth() {
               {isSignUp ? 'Already have an account? Sign in' : "Don't have an account? Sign up"}
             </button>
           </div>
+            </>
+          )}
         </div>
       </div>
     </div>

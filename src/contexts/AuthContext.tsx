@@ -58,11 +58,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
+      options: {
+        emailRedirectTo: window.location.origin,
+        data: {
+          display_name: displayName,
+        },
+      },
     });
 
     if (error) throw error;
 
-    if (data.user) {
+    if (data.user && data.user.identities && data.user.identities.length > 0) {
       await supabase.from('profiles').insert({
         id: data.user.id,
         email,
@@ -72,12 +78,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
     if (error) throw error;
+
+    if (data.user && !data.user.email_confirmed_at) {
+      await supabase.auth.signOut();
+      throw new Error('Please verify your email before signing in. Check your inbox for the verification link.');
+    }
   };
 
   const signOut = async () => {
