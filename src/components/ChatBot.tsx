@@ -717,7 +717,7 @@ export function ChatBot() {
     '👍', '👏', '🤝', '💯', '✅', '⭐', '🏆', '🎯'
   ];
 
-  if (journalMode === 'journal') {
+  if (journalMode === 'journal' && !showSettings) {
     return <Journal onOpenSettings={() => setShowSettings(true)} />;
   }
 

@@ -96,6 +96,13 @@ export function Journal({ onOpenSettings }: JournalProps = {}) {
   const createNewEntry = async () => {
     if (!user) return;
 
+    const existingEntry = entries.find(e => e.entry_date === selectedDate);
+    if (existingEntry) {
+      setCurrentEntry(existingEntry);
+      await loadMessages(existingEntry.id);
+      return;
+    }
+
     const prompt = journalPrompts[Math.floor(Math.random() * journalPrompts.length)];
 
     const { data, error } = await supabase
@@ -539,12 +546,14 @@ export function Journal({ onOpenSettings }: JournalProps = {}) {
                         <p
                           className={`leading-relaxed ${
                             message.role === 'user'
-                              ? 'text-gray-900 text-base'
-                              : 'text-blue-800 text-sm italic'
+                              ? 'text-gray-900'
+                              : 'text-blue-700 text-sm italic'
                           }`}
                           style={{
-                            fontFamily: message.role === 'user' ? 'Georgia, serif' : 'Brush Script MT, cursive',
-                            lineHeight: '2rem',
+                            fontFamily: message.role === 'user' ? "'Kalam', 'Patrick Hand', 'Comic Sans MS', cursive" : 'Georgia, serif',
+                            fontSize: message.role === 'user' ? '1.125rem' : '0.875rem',
+                            lineHeight: message.role === 'user' ? '2.25rem' : '1.75rem',
+                            letterSpacing: message.role === 'user' ? '0.01em' : 'normal',
                           }}
                         >
                           {message.content}
