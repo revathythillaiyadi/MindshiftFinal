@@ -76,7 +76,8 @@ export type JournalEntry = {
   user_id: string;
   entry_date: string;
   content: string;
+  raw_text_content?: string;
   title: string;
-  created_at: string;
-  updated_at: string;
+  created_at?: string;
+  updated_at?: string;
 };
