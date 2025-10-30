@@ -1,0 +1,13 @@
+# MindShift App Environment Variables
+# Copy this file to .env.local for local development
+
+# N8N Webhook Integration
+VITE_N8N_WEBHOOK_URL=https://your-n8n-instance.com/webhook/mindshift
+
+# Supabase Configuration (if needed)
+VITE_SUPABASE_URL=your_supabase_url
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+
+# OpenAI Configuration (if needed for frontend)
+VITE_OPENAI_API_KEY=your_openai_api_key
+

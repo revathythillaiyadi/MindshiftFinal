@@ -10,7 +10,8 @@ export function Auth() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [verificationSent, setVerificationSent] = useState(false);
-  const { signIn, signUp } = useAuth();
+  const [resetSent, setResetSent] = useState(false);
+  const { signIn, signUp, resetPassword } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,6 +27,25 @@ export function Auth() {
       }
     } catch (err: any) {
       setError(err.message || 'An error occurred');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePasswordReset = async () => {
+    if (!email) {
+      setError('Please enter your email address first');
+      return;
+    }
+
+    setError('');
+    setLoading(true);
+
+    try {
+      await resetPassword(email);
+      setResetSent(true);
+    } catch (err: any) {
+      setError(err.message || 'Failed to send password reset email');
     } finally {
       setLoading(false);
     }
@@ -73,6 +93,42 @@ export function Auth() {
               <button
                 onClick={() => {
                   setVerificationSent(false);
+                  setIsSignUp(false);
+                  setEmail('');
+                  setPassword('');
+                  setDisplayName('');
+                }}
+                className="mt-6 px-6 py-3 bg-gradient-to-r from-pink-500 via-purple-500 to-blue-500 text-white rounded-xl hover:shadow-lg transition-all active:scale-95"
+              >
+                Back to Sign In
+              </button>
+            </div>
+          ) : resetSent ? (
+            <div className="text-center py-8 space-y-4">
+              <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-full mb-4">
+                <Mail className="w-8 h-8 text-white" />
+              </div>
+              <h2 className="text-2xl font-semibold text-gray-800">Password Reset Sent</h2>
+              <p className="text-gray-600 leading-relaxed">
+                We've sent a password reset link to <strong>{email}</strong>. Please check your inbox and follow the instructions.
+              </p>
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mt-4">
+                <div className="flex items-start gap-3">
+                  <CheckCircle className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
+                  <div className="text-sm text-blue-800 text-left">
+                    <p className="font-medium mb-1">Next Steps:</p>
+                    <ul className="list-disc list-inside space-y-1 text-blue-700">
+                      <li>Check your email inbox (and spam folder)</li>
+                      <li>Click the password reset link</li>
+                      <li>Create a new password</li>
+                      <li>Return here to sign in</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setResetSent(false);
                   setIsSignUp(false);
                   setEmail('');
                   setPassword('');
@@ -149,7 +205,17 @@ export function Auth() {
             </button>
           </form>
 
-          <div className="mt-6 text-center">
+          <div className="mt-6 space-y-3 text-center">
+            {!isSignUp && (
+              <button
+                onClick={handlePasswordReset}
+                disabled={loading || !email}
+                className="text-sm text-blue-600 hover:text-blue-500 transition-colors active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Forgot your password?
+              </button>
+            )}
+            
             <button
               onClick={() => {
                 setIsSignUp(!isSignUp);

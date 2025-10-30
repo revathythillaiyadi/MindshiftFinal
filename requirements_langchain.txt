@@ -1,0 +1,28 @@
+# LangChain SOM Data Loading and Embedding Pipeline Requirements
+
+# Core LangChain packages
+langchain==0.1.0
+langchain-community==0.0.10
+langchain-openai==0.0.5
+
+# Document processing
+python-docx==1.1.0
+pypdf==4.0.1
+
+# Vector database
+chromadb==0.4.22
+
+# OpenAI integration
+openai==1.12.0
+
+# Environment management
+python-dotenv==1.0.0
+
+# Utilities
+tqdm==4.66.1
+pathlib2==2.3.7
+
+# Optional: For better document processing
+unstructured==0.11.6
+pandoc==2.3
+

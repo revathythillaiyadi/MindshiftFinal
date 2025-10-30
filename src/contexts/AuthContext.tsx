@@ -9,6 +9,7 @@ type AuthContextType = {
   signUp: (email: string, password: string, displayName: string) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -149,25 +150,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: window.location.origin,
-        data: {
-          display_name: displayName,
-        },
-      },
-    });
-
-    if (error) throw error;
-
-    if (data.user && data.user.identities && data.user.identities.length > 0) {
-      await supabase.from('profiles').insert({
-        id: data.user.id,
+    try {
+      const { data, error } = await supabase.auth.signUp({
         email,
-        display_name: displayName,
+        password,
+        options: {
+          emailRedirectTo: window.location.origin,
+          data: {
+            display_name: displayName,
+          },
+        },
       });
+
+      if (error) {
+        // Handle specific error cases
+        if (error.message.includes('already registered') || error.message.includes('User already registered')) {
+          throw new Error('This email is already registered. Please try signing in instead.');
+        }
+        throw error;
+      }
+
+      // If user was created successfully, create profile
+      if (data.user && data.user.identities && data.user.identities.length > 0) {
+        try {
+          await supabase.from('profiles').insert({
+            id: data.user.id,
+            email,
+            display_name: displayName,
+          });
+        } catch (profileError) {
+          console.warn('Profile creation failed, but user was created:', profileError);
+          // Don't throw here - user can still sign in
+        }
+      }
+    } catch (error: any) {
+      // Re-throw with better error message
+      if (error.message.includes('already registered') || error.message.includes('User already registered')) {
+        throw new Error('This email is already registered. Please try signing in instead.');
+      }
+      throw error;
     }
   };
 
@@ -206,16 +227,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-    if (error) throw error;
+      if (error) {
+        // Handle specific error cases
+        if (error.message.includes('Invalid login credentials')) {
+          throw new Error('Invalid email or password. Please check your credentials and try again.');
+        }
+        if (error.message.includes('Email not confirmed')) {
+          throw new Error('Please verify your email before signing in. Check your inbox for the verification link.');
+        }
+        throw error;
+      }
 
-    if (data.user && !data.user.email_confirmed_at) {
-      await supabase.auth.signOut();
-      throw new Error('Please verify your email before signing in. Check your inbox for the verification link.');
+      if (data.user && !data.user.email_confirmed_at) {
+        await supabase.auth.signOut();
+        throw new Error('Please verify your email before signing in. Check your inbox for the verification link.');
+      }
+    } catch (error: any) {
+      // Re-throw with better error message
+      if (error.message.includes('Invalid login credentials')) {
+        throw new Error('Invalid email or password. Please check your credentials and try again.');
+      }
+      if (error.message.includes('Email not confirmed')) {
+        throw new Error('Please verify your email before signing in. Check your inbox for the verification link.');
+      }
+      throw error;
     }
   };
 
@@ -230,8 +271,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await supabase.auth.signOut();
   };
 
+  const resetPassword = async (email: string) => {
+    if (!supabase) {
+      throw new Error('Password reset not available in demo mode');
+    }
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+
+      if (error) {
+        throw error;
+      }
+    } catch (error: any) {
+      throw new Error('Failed to send password reset email. Please try again.');
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signUp, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, profile, loading, signUp, signIn, signOut, resetPassword }}>
       {children}
     </AuthContext.Provider>
   );
